@@ -5,7 +5,7 @@
  * 1. Google Apps Script (script.google.com) で新規プロジェクトを作成
  * 2. このファイルの内容を貼り付ける
  * 3. CONFIG の各値を自分の環境に合わせて変更
- * 4. スクリプトプロパティに CLAUDE_API_KEY を設定
+ * 4. スクリプトプロパティに GEMINI_API_KEY を設定
  *    （エディタ上部: プロジェクトの設定 → スクリプトプロパティ → 追加）
  * 5. 初回は setup() を手動実行してシートとトリガーを作成する
  */
@@ -25,8 +25,8 @@ const CONFIG = {
   // 追加の検索クエリ（例: 'subject:お問い合わせ'）
   EXTRA_QUERY: '',
 
-  // Claude API モデル
-  CLAUDE_MODEL: 'claude-haiku-4-5-20251001',
+  // Gemini API モデル
+  GEMINI_MODEL: 'gemini-2.0-flash',
 };
 
 // ===== ヘッダー定義 =====
@@ -64,7 +64,7 @@ function setup() {
 function syncInquiryEmails() {
   const sheet = _getSheet();
   const processedIds = _getProcessedIds();
-  const apiKey = PropertiesService.getScriptProperties().getProperty('CLAUDE_API_KEY');
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
 
   const query = _buildQuery();
   const threads = GmailApp.search(query, 0, 20); // AI解析があるので1回あたり20件
@@ -98,7 +98,7 @@ function syncInquiryEmails() {
 
     if (apiKey) {
       try {
-        parsed = _analyzeWithClaude(apiKey, message.getSubject(), body);
+        parsed = _analyzeWithGemini(apiKey, message.getSubject(), body);
       } catch (e) {
         Logger.log(`AI解析エラー (threadId: ${threadId}): ${e.message}`);
       }
@@ -156,9 +156,9 @@ function syncInquiryEmails() {
 }
 
 /**
- * Claude API でメール本文を解析して構造化情報を返す
+ * Gemini API でメール本文を解析して構造化情報を返す
  */
-function _analyzeWithClaude(apiKey, subject, body) {
+function _analyzeWithGemini(apiKey, subject, body) {
   const prompt = `以下のメール件名と本文を解析して、JSON形式で情報を抽出してください。
 
 件名: ${subject}
@@ -176,19 +176,19 @@ ${body.slice(0, 2000)}
   "urgency": "緊急度（高・中・通常のいずれか）"
 }`;
 
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${apiKey}`;
+
   const payload = {
-    model: CONFIG.CLAUDE_MODEL,
-    max_tokens: 512,
-    messages: [{ role: 'user', content: prompt }],
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      maxOutputTokens: 512,
+    },
   };
 
-  const response = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+  const response = UrlFetchApp.fetch(url, {
     method: 'post',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
+    headers: { 'Content-Type': 'application/json' },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
   });
@@ -199,8 +199,7 @@ ${body.slice(0, 2000)}
     throw new Error(result.error.message);
   }
 
-  const text = result.content[0].text.trim();
-  // JSONブロックが含まれる場合に対応
+  const text = result.candidates[0].content.parts[0].text.trim();
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   return jsonMatch ? JSON.parse(jsonMatch[0]) : {};
 }

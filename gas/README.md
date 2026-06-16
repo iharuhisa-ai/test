@@ -16,9 +16,9 @@ Gmail に届いた問い合わせメールを Claude AI で解析し、Google �
 
 ## セットアップ手順
 
-### 1. Claude API キーを取得する
+### 1. Gemini API キーを取得する
 
-[Anthropic Console](https://console.anthropic.com/) でアカウントを作成し、API キーを取得してください。
+[Google AI Studio](https://aistudio.google.com/app/apikey) で API キーを取得してください（Google アカウントがあれば無料で利用できます）。
 
 ### 2. Gmail ラベルを作成する
 
@@ -46,7 +46,7 @@ const CONFIG = {
   LABEL_NAME: '問い合わせ',               // ← Gmail のラベル名に変更
   SHEET_NAME: '問い合わせ一覧',
   EXTRA_QUERY: '',
-  CLAUDE_MODEL: 'claude-haiku-4-5-20251001', // 高速・低コストモデル
+  GEMINI_MODEL: 'gemini-2.0-flash',           // 高速・低コストモデル
 };
 ```
 
@@ -57,7 +57,7 @@ Apps Script エディタで：
 
 | プロパティ名 | 値 |
 |------------|-----|
-| `CLAUDE_API_KEY` | `sk-ant-api03-...`（取得したAPIキー） |
+| `GEMINI_API_KEY` | `AIza...`（取得したAPIキー） |
 
 > ⚠️ APIキーはスクリプト内に直書きせず、必ずスクリプトプロパティに設定してください。
 
@@ -88,9 +88,9 @@ Apps Script エディタで `setup` 関数を選択して実行してくださ�
 
 ## コスト目安
 
-`claude-haiku-4-5-20251001` 使用時：  
-メール1件あたり約 **0.001〜0.003ドル**（本文2000文字の場合）  
-月100件の問い合わせで概算 **0.1〜0.3ドル** 程度
+`gemini-2.0-flash` 使用時：  
+無料枠（1分あたり15リクエスト、1日1500リクエスト）内であれば **無料**。  
+超過した場合もメール1件あたり約 **0.0001ドル以下** と非常に低コストです。
 
 ## カスタマイズ
 
