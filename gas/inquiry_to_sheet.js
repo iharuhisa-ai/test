@@ -204,7 +204,112 @@ ${body.slice(0, 2000)}
   return jsonMatch ? JSON.parse(jsonMatch[0]) : {};
 }
 
-// ===== 内部ヘルパー関数 =====
+/**
+ * 過去メールを一括取り込み
+ * 初回セットアップ後に一度だけ実行してください
+ * ラベルが付いているすべてのメールをスプレッドシートに転記します
+ */
+function importAllExistingEmails() {
+  const sheet = _getSheet();
+  const processedIds = _getProcessedIds();
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+
+  // 日付制限なしでラベルのメールをすべて取得（500件まで）
+  const parts = [];
+  if (CONFIG.LABEL_NAME) parts.push(`label:${CONFIG.LABEL_NAME}`);
+  if (CONFIG.EXTRA_QUERY) parts.push(CONFIG.EXTRA_QUERY);
+  const query = parts.join(' ') || 'in:inbox';
+
+  let start = 0;
+  const batchSize = 20; // AI解析があるため1バッチ20件
+  let totalImported = 0;
+
+  while (true) {
+    const threads = GmailApp.search(query, start, batchSize);
+    if (threads.length === 0) break;
+
+    const newRows = [];
+
+    threads.forEach((thread) => {
+      const threadId = thread.getId();
+      if (processedIds.has(threadId)) return;
+
+      const message = thread.getMessages()[0];
+      const from = message.getFrom();
+      const emailMatch = from.match(/<(.+?)>/);
+      const emailAddress = emailMatch ? emailMatch[1] : from;
+      const displayName = emailMatch ? from.replace(/<.+?>/, '').trim() : from;
+
+      const body = message.getPlainBody().trim();
+      const bodyPreview = body.replace(/\s+/g, ' ').slice(0, 300);
+
+      let parsed = { companyName: '', personName: '', phone: '', inquiryType: '', summary: '', urgency: '通常' };
+      if (apiKey) {
+        try {
+          parsed = _analyzeWithGemini(apiKey, message.getSubject(), body);
+        } catch (e) {
+          Logger.log(`AI解析エラー (threadId: ${threadId}): ${e.message}`);
+        }
+      }
+
+      newRows.push([
+        message.getDate(),
+        message.getSubject(),
+        displayName,
+        emailAddress,
+        parsed.companyName,
+        parsed.personName,
+        parsed.phone,
+        parsed.inquiryType,
+        parsed.summary,
+        parsed.urgency,
+        bodyPreview,
+        threadId,
+        '未対応',
+        '',
+        '',
+      ]);
+
+      processedIds.add(threadId);
+    });
+
+    if (newRows.length > 0) {
+      const insertRow = 2;
+      sheet.insertRowsBefore(insertRow, newRows.length);
+      const range = sheet.getRange(insertRow, 1, newRows.length, HEADERS.length);
+      range.setValues(newRows);
+      sheet.getRange(insertRow, 1, newRows.length, 1).setNumberFormat('yyyy/MM/dd HH:mm');
+
+      const statusRule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(['未対応', '対応中', '完了', '保留'], true)
+        .build();
+      sheet.getRange(insertRow, 13, newRows.length, 1).setDataValidation(statusRule);
+
+      for (let i = 0; i < newRows.length; i++) {
+        const urgency = newRows[i][9];
+        if (urgency === '高') sheet.getRange(insertRow + i, 1, 1, HEADERS.length).setBackground('#fce8e6');
+        else if (urgency === '中') sheet.getRange(insertRow + i, 1, 1, HEADERS.length).setBackground('#fef9e7');
+      }
+
+      totalImported += newRows.length;
+      _saveProcessedIds(processedIds);
+    }
+
+    // 取得件数がbatchSizeより少なければ最終ページ
+    if (threads.length < batchSize) break;
+    start += batchSize;
+
+    // GAS の実行時間制限（6分）を考慮して途中で止める
+    if (totalImported >= 200) {
+      Logger.log(`200件に達したため一時停止。続きは再度 importAllExistingEmails を実行してください。`);
+      break;
+    }
+  }
+
+  Logger.log(`合計 ${totalImported} 件のメールを取り込みました。`);
+}
+
+
 
 function _buildQuery() {
   const parts = [];
