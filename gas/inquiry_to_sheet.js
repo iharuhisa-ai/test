@@ -252,6 +252,96 @@ function _saveProcessedIds(idSet) {
   PropertiesService.getScriptProperties().setProperty('processedThreadIds', JSON.stringify(arr));
 }
 
+/**
+ * テスト用: サンプルメールをスプレッドシートに書き込む
+ * Apps Script エディタから手動で実行してください
+ */
+function testWithSampleEmail() {
+  const sheet = _getSheet();
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+
+  const subject = '【お伺いしたい件】2026年6月28日 宿泊予約 アテンドサービス / Family Haus 0628';
+  const body = `株式会社G.S.P.Corporation
+セック様
+
+いつも大変お世話になっております。
+Bespoke Japan Travelの宮島と申します。
+下記のサービスにつき、ご相談させていただきたくご連絡させていただいております。
+現時点で日程を押さえていただく必要はございませんが、空き状況をご教示いただけないでしょうか。
+お忙しいところ恐縮ですが、早めにご返信いただけると大変助かります。
+何卒よろしくお願い申し上げます。
+
+**********************
+●日時：2026年6月28日（日）
+●人数: アメリカより大人４名
+※英語対応を希望いたします。
+●フライト：羽田空港  19:25着 AS831便
+●ご依頼内容：空港アテンドサービス
+ブリッジでお迎え後、入国審査にご同行いただき、弊社手配のハイヤーまでご案内。
+●ご料金：60,500円（税込み、管理手数料10％込）/ お客様1名あたりでお間違いなかったでしょうか
+●キャンセルポリシー：業務日より14日前より50％、7日前より100％
+●支払い方法：事前銀行振り込み
+※ご請求書をメールでお送りいただきたいと存じます。お支払い期限がございましたらご教示ください
+**********************
+
+何卒よろしくお願い申し上げます。
+
+*Bespoke Japan Travel 株式会社*
+宮島菜実 Nami MIYAJIMA
+Tel：050-6883-1811
+FAX：050-4561-7326
+email：operation@bespokejapantravel.com
+Web：https://www.bespokejapantravel.com`;
+
+  let parsed = {
+    companyName: 'Bespoke Japan Travel 株式会社',
+    personName: '宮島菜実',
+    phone: '050-6883-1811',
+    inquiryType: '空港アテンドサービス問い合わせ',
+    summary: '2026/6/28 羽田空港 19:25着 AS831便、米国人大人4名の空港アテンドサービス依頼。料金・キャンセルポリシーの確認。',
+    urgency: '通常',
+  };
+
+  if (apiKey) {
+    try {
+      parsed = _analyzeWithGemini(apiKey, subject, body);
+      Logger.log('AI解析結果: ' + JSON.stringify(parsed));
+    } catch (e) {
+      Logger.log('AI解析エラー（フォールバック値を使用）: ' + e.message);
+    }
+  }
+
+  const insertRow = 2;
+  sheet.insertRowsBefore(insertRow, 1);
+  const range = sheet.getRange(insertRow, 1, 1, HEADERS.length);
+  range.setValues([[
+    new Date('2026-05-29T12:13:18+09:00'),
+    subject,
+    'Bespoke Japan Travel',
+    'operation@bespokejapantravel.com',
+    parsed.companyName,
+    parsed.personName,
+    parsed.phone,
+    parsed.inquiryType,
+    parsed.summary,
+    parsed.urgency,
+    body.replace(/\s+/g, ' ').slice(0, 300),
+    'test-thread-family-haus-0628',
+    '未対応',
+    '',
+    '',
+  ]]);
+
+  sheet.getRange(insertRow, 1, 1, 1).setNumberFormat('yyyy/MM/dd HH:mm');
+
+  const statusRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['未対応', '対応中', '完了', '保留'], true)
+    .build();
+  sheet.getRange(insertRow, 13, 1, 1).setDataValidation(statusRule);
+
+  Logger.log('テストメールをスプレッドシートに書き込みました。');
+}
+
 function _registerTrigger() {
   ScriptApp.getProjectTriggers().forEach((t) => {
     if (t.getHandlerFunction() === 'syncInquiryEmails') {
