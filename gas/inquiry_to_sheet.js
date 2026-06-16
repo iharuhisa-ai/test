@@ -46,7 +46,32 @@ const HEADERS = [
   'ステータス',
   '担当者',
   '対応メモ',
+  '最終返信日時',
+  '返信件数',
+  '最新返信内容',
 ];
+
+// 列インデックス（0始まり）
+const COL = {
+  RECEIVED:      0,
+  SUBJECT:       1,
+  FROM_NAME:     2,
+  FROM_EMAIL:    3,
+  COMPANY:       4,
+  PERSON:        5,
+  PHONE:         6,
+  TYPE:          7,
+  SUMMARY:       8,
+  URGENCY:       9,
+  BODY:          10,
+  THREAD_ID:     11,
+  STATUS:        12,
+  ASSIGNEE:      13,
+  MEMO:          14,
+  LAST_REPLY_AT: 15,
+  REPLY_COUNT:   16,
+  LAST_REPLY:    17,
+};
 
 /**
  * 初回セットアップ: シート作成 + トリガー登録
@@ -60,53 +85,68 @@ function setup() {
 
 /**
  * トリガーから呼び出されるメイン関数
+ * 新規スレッド → 新しい行を追加
+ * 既存スレッドに返信あり → 最終返信日時・返信件数・最新返信内容を更新
  */
 function syncInquiryEmails() {
   const sheet = _getSheet();
   const processedIds = _getProcessedIds();
   const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  const threadRowMap = _buildThreadRowMap(sheet);
 
   const query = _buildQuery();
-  const threads = GmailApp.search(query, 0, 20); // AI解析があるので1回あたり20件
+  const threads = GmailApp.search(query, 0, 20);
 
   if (threads.length === 0) return;
 
   const newRows = [];
+  let updatedCount = 0;
 
   threads.forEach((thread) => {
     const threadId = thread.getId();
+    const messages = thread.getMessages();
+    const firstMsg = messages[0];
+    const lastMsg = messages[messages.length - 1];
+    const replyCount = messages.length;
+
+    // ── 既存スレッドへの返信 ──
+    if (threadRowMap[threadId]) {
+      const rowNum = threadRowMap[threadId];
+      const lastReplyPreview = lastMsg.getPlainBody().replace(/\s+/g, ' ').trim().slice(0, 300);
+      sheet.getRange(rowNum, COL.LAST_REPLY_AT + 1).setValue(lastMsg.getDate())
+        .setNumberFormat('yyyy/MM/dd HH:mm');
+      sheet.getRange(rowNum, COL.REPLY_COUNT + 1).setValue(replyCount);
+      sheet.getRange(rowNum, COL.LAST_REPLY + 1).setValue(lastReplyPreview);
+      updatedCount++;
+      return;
+    }
+
+    // ── 新規スレッド ──
     if (processedIds.has(threadId)) return;
 
-    const message = thread.getMessages()[0];
-    const from = message.getFrom();
+    const from = firstMsg.getFrom();
     const emailMatch = from.match(/<(.+?)>/);
     const emailAddress = emailMatch ? emailMatch[1] : from;
     const displayName = emailMatch ? from.replace(/<.+?>/, '').trim() : from;
 
-    const body = message.getPlainBody().trim();
+    const body = firstMsg.getPlainBody().trim();
     const bodyPreview = body.replace(/\s+/g, ' ').slice(0, 300);
+    const lastReplyPreview = replyCount > 1
+      ? lastMsg.getPlainBody().replace(/\s+/g, ' ').trim().slice(0, 300)
+      : '';
 
-    // AI解析
-    let parsed = {
-      companyName: '',
-      personName: '',
-      phone: '',
-      inquiryType: '',
-      summary: '',
-      urgency: '通常',
-    };
-
+    let parsed = { companyName: '', personName: '', phone: '', inquiryType: '', summary: '', urgency: '通常' };
     if (apiKey) {
       try {
-        parsed = _analyzeWithGemini(apiKey, message.getSubject(), body);
+        parsed = _analyzeWithGemini(apiKey, firstMsg.getSubject(), body);
       } catch (e) {
         Logger.log(`AI解析エラー (threadId: ${threadId}): ${e.message}`);
       }
     }
 
     newRows.push([
-      message.getDate(),
-      message.getSubject(),
+      firstMsg.getDate(),
+      firstMsg.getSubject(),
       displayName,
       emailAddress,
       parsed.companyName,
@@ -120,6 +160,9 @@ function syncInquiryEmails() {
       '未対応',
       '',
       '',
+      replyCount > 1 ? lastMsg.getDate() : '',
+      replyCount,
+      lastReplyPreview,
     ]);
 
     processedIds.add(threadId);
@@ -131,27 +174,24 @@ function syncInquiryEmails() {
     const range = sheet.getRange(insertRow, 1, newRows.length, HEADERS.length);
     range.setValues(newRows);
 
-    sheet.getRange(insertRow, 1, newRows.length, 1)
-      .setNumberFormat('yyyy/MM/dd HH:mm');
+    sheet.getRange(insertRow, COL.RECEIVED + 1, newRows.length, 1).setNumberFormat('yyyy/MM/dd HH:mm');
+    sheet.getRange(insertRow, COL.LAST_REPLY_AT + 1, newRows.length, 1).setNumberFormat('yyyy/MM/dd HH:mm');
 
-    // ステータスのプルダウン
     const statusRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(['未対応', '対応中', '完了', '保留'], true)
       .build();
-    sheet.getRange(insertRow, 13, newRows.length, 1).setDataValidation(statusRule);
+    sheet.getRange(insertRow, COL.STATUS + 1, newRows.length, 1).setDataValidation(statusRule);
 
-    // 緊急度による色付け
     for (let i = 0; i < newRows.length; i++) {
-      const urgency = newRows[i][9];
-      if (urgency === '高') {
-        sheet.getRange(insertRow + i, 1, 1, HEADERS.length).setBackground('#fce8e6');
-      } else if (urgency === '中') {
-        sheet.getRange(insertRow + i, 1, 1, HEADERS.length).setBackground('#fef9e7');
-      }
+      const urgency = newRows[i][COL.URGENCY];
+      if (urgency === '高') sheet.getRange(insertRow + i, 1, 1, HEADERS.length).setBackground('#fce8e6');
+      else if (urgency === '中') sheet.getRange(insertRow + i, 1, 1, HEADERS.length).setBackground('#fef9e7');
     }
 
     _saveProcessedIds(processedIds);
-    Logger.log(`${newRows.length} 件のメールを転記しました。`);
+    Logger.log(`新規 ${newRows.length} 件追加、更新 ${updatedCount} 件。`);
+  } else {
+    Logger.log(`更新 ${updatedCount} 件。`);
   }
 }
 
@@ -252,6 +292,12 @@ function importAllExistingEmails() {
         }
       }
 
+      const msgs = thread.getMessages();
+      const lastMsg = msgs[msgs.length - 1];
+      const replyCount = msgs.length;
+      const lastReplyPreview = replyCount > 1
+        ? lastMsg.getPlainBody().replace(/\s+/g, ' ').trim().slice(0, 300) : '';
+
       newRows.push([
         message.getDate(),
         message.getSubject(),
@@ -268,6 +314,9 @@ function importAllExistingEmails() {
         '未対応',
         '',
         '',
+        replyCount > 1 ? lastMsg.getDate() : '',
+        replyCount,
+        lastReplyPreview,
       ]);
 
       processedIds.add(threadId);
@@ -283,10 +332,10 @@ function importAllExistingEmails() {
       const statusRule = SpreadsheetApp.newDataValidation()
         .requireValueInList(['未対応', '対応中', '完了', '保留'], true)
         .build();
-      sheet.getRange(insertRow, 13, newRows.length, 1).setDataValidation(statusRule);
+      sheet.getRange(insertRow, COL.STATUS + 1, newRows.length, 1).setDataValidation(statusRule);
 
       for (let i = 0; i < newRows.length; i++) {
-        const urgency = newRows[i][9];
+        const urgency = newRows[i][COL.URGENCY];
         if (urgency === '高') sheet.getRange(insertRow + i, 1, 1, HEADERS.length).setBackground('#fce8e6');
         else if (urgency === '中') sheet.getRange(insertRow + i, 1, 1, HEADERS.length).setBackground('#fef9e7');
       }
@@ -341,10 +390,24 @@ function _ensureSheet() {
     headerRange.setFontColor('#ffffff');
     sheet.setFrozenRows(1);
 
-    const widths = [150, 250, 130, 200, 150, 120, 130, 130, 350, 80, 300, 120, 100, 120, 250];
+    const widths = [150, 250, 130, 200, 150, 120, 130, 130, 350, 80, 300, 120, 100, 120, 250, 150, 80, 300];
     widths.forEach((w, i) => sheet.setColumnWidth(i + 1, w));
   }
   return sheet;
+}
+
+/**
+ * シートのスレッドID列を読んで { threadId: rowNumber } のマップを返す
+ */
+function _buildThreadRowMap(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return {};
+  const threadIds = sheet.getRange(2, COL.THREAD_ID + 1, lastRow - 1, 1).getValues();
+  const map = {};
+  threadIds.forEach((row, i) => {
+    if (row[0]) map[row[0]] = i + 2; // 行番号は1始まり、ヘッダー分+1
+  });
+  return map;
 }
 
 function _getProcessedIds() {
