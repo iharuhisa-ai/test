@@ -3,13 +3,10 @@
 // ==========================================
 const CONFIG = {
   // PDFを一時保存するGoogleドライブのフォルダID
-  PDF_FOLDER_ID: 'ここにフォルダIDを入力',
+  PDF_FOLDER_ID:  'ここにフォルダIDを入力',
 
-  // 書き込み先スプレッドシートID（送付のExcelをGoogleスプレッドシートに変換したもの）
+  // 書き込み先スプレッドシートID
   SPREADSHEET_ID: 'ここにスプレッドシートIDを入力',
-
-  // Gemini API キー（Google AI Studio で取得: https://aistudio.google.com/apikey）
-  GEMINI_API_KEY: 'ここにAPIキーを入力',
 
   // 処理ログシート名
   SHEET_LOG: '処理ログ',
@@ -17,11 +14,12 @@ const CONFIG = {
 
 // ==========================================
 // 会社名キーワード → シート振り分けルール
+// 新しい会社を追加する場合は keywords に追記してください
 // ==========================================
 const SHEET_ROUTING = [
   {
     sheet: 'EXEO・新菱冷熱・東急建設',
-    keywords: ['エクシオ', 'exeo', 'EXEO', '新菱', '東急建設', 'デルタ電子', 'delta', 'SEC齋藤'],
+    keywords: ['エクシオ', 'exeo', '新菱', '東急建設', 'デルタ電子', 'delta', 'SEC齋藤'],
   },
   {
     sheet: 'PDG',
@@ -33,7 +31,7 @@ const SHEET_ROUTING = [
   },
   {
     sheet: '4F ABC',
-    keywords: ['Zenlayer', 'ABC'],
+    keywords: ['Zenlayer'],
   },
   // 上記に一致しない場合は「その他」へ
 ];
@@ -53,7 +51,7 @@ function onOpen() {
 }
 
 // ==========================================
-// ダイアログ表示（ローカルPDFを選択して取込）
+// ファイル選択ダイアログ
 // ==========================================
 function showUploadDialog() {
   const html = HtmlService.createHtmlOutput(`
@@ -183,7 +181,7 @@ function uploadAndProcessPDF(base64Data, fileName) {
       pdfFile.setTrashed(true);
       return 'スキップ（処理済み）';
     }
-    const data    = extractDataWithAI(pdfFile);
+    const data    = extractDataFromPDF(pdfFile);
     const results = writeToSheets(data);
     markAsProcessed(pdfFile.getId(), fileName);
     writeLog(fileName, '成功', results);
@@ -214,7 +212,7 @@ function processNewPDFs() {
   allFiles.forEach((file, index) => {
     Logger.log('[' + (index + 1) + '/' + allFiles.length + '] ' + file.getName());
     try {
-      const data    = extractDataWithAI(file);
+      const data    = extractDataFromPDF(file);
       const results = writeToSheets(data);
       markAsProcessed(file.getId(), file.getName());
       writeLog(file.getName(), '成功', results);
@@ -223,97 +221,208 @@ function processNewPDFs() {
       writeLog(file.getName(), 'エラー', e.message);
       Logger.log('  → エラー: ' + e.message);
     }
-    if (index < allFiles.length - 1) Utilities.sleep(2000);
+    if (index < allFiles.length - 1) Utilities.sleep(1500);
   });
 }
 
 // ==========================================
-// Gemini API で PDF からデータ抽出
+// PDF → Googleドキュメント変換でテキスト抽出（無料・Drive API使用）
 // ==========================================
-function extractDataWithAI(pdfFile) {
-  const base64Pdf = Utilities.base64Encode(pdfFile.getBlob().getBytes());
+function extractDataFromPDF(pdfFile) {
+  // PDFをGoogleドキュメントに変換
+  const tempDoc = Drive.Files.copy(
+    { title: '__temp__' + pdfFile.getId(), mimeType: MimeType.GOOGLE_DOCS },
+    pdfFile.getId(),
+    { convert: true }
+  );
 
-  const prompt = `
-以下のTY1入館申請書PDFを解析して、JSON形式で情報を抽出してください。
+  Utilities.sleep(2000); // 変換完了待ち
 
-抽出するJSON形式:
-{
-  "applicant": {
-    "company": "申請者の会社名",
-    "name": "申請者の氏名",
-    "phone": "申請者の電話番号"
-  },
-  "period": {
-    "startDate": "入館開始日 (YYYY/MM/DD形式)",
-    "endDate": "入館終了日 (YYYY/MM/DD形式)",
-    "entryTime": "入館予定時刻 (HH:MM形式)",
-    "exitTime": "退館予定時刻 (HH:MM形式)"
-  },
-  "accessArea": "入室箇所（すべて記載）",
-  "purpose": "入館目的",
-  "entryType": "連続入館 or 断続入館 or 両方",
-  "visitors": [
-    {
-      "company": "入館者の会社名",
-      "name": "入館者の氏名",
-      "phone": "入館者の電話番号"
-    }
-  ]
-}
+  let text = '';
+  try {
+    text = DocumentApp.openById(tempDoc.id).getBody().getText();
+  } finally {
+    DriveApp.getFileById(tempDoc.id).setTrashed(true); // 一時ファイルを必ず削除
+  }
 
-注意:
-- 入館者情報テーブルに複数人いる場合はすべてvisitorsに含める
-- 入館者会社名が空欄の場合は申請者会社名を使う
-- JSONのみを返し、説明文は不要
-`;
+  Logger.log('=== 抽出テキスト ===\n' + text + '\n===================');
 
-  const url = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=' + CONFIG.GEMINI_API_KEY;
+  // ==========================================
+  // 書式の違いに対応した柔軟な抽出
+  // ==========================================
+  const applicantCompany = extractAny(text, [
+    /会社名[\/\*\s]*Company Name\s*[\n\r]+([^\n\r]+)/,
+    /会社名[^\n]*\n([^\n]+)/,
+    /Company Name[^\n]*\n([^\n]+)/,
+  ]);
 
-  const payload = {
-    contents: [{
-      parts: [
-        { text: prompt },
-        { inline_data: { mime_type: 'application/pdf', data: base64Pdf } },
-      ],
-    }],
-    generationConfig: { temperature: 0 },
+  const applicantName = extractAny(text, [
+    /氏名[\/\*\s]*Name\s*[\n\r]+([^\n\r]+)/,
+    /氏名[^\n]*\n([^\n]+)/,
+    /\*Name[^\n]*\n([^\n]+)/,
+  ]);
+
+  const applicantPhone = extractAny(text, [
+    /電話番号[\/\*\s]*Phone Number\s*[\n\r]+([^\n\r]+)/,
+    /電話番号[^\n]*\n([^\n]+)/,
+    /Phone Number[^\n]*\n([^\n]+)/,
+  ]);
+
+  const startDate = extractAny(text, [
+    /入館開始日[^\n]*\n(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,
+    /Start Date[^\n]*\n(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,
+    /(\d{4}\/\d{2}\/\d{2})(?=.*入館開始|.*Start)/,
+  ]);
+
+  const endDate = extractAny(text, [
+    /入館終了日[^\n]*\n(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,
+    /End Date[^\n]*\n(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,
+  ]);
+
+  const entryTime = extractAny(text, [
+    /入館予定時刻[^\n]*\n[^\n]*\n(\d{1,2}:\d{2})/,
+    /Scheduled Entry Time[^\n]*\n[^\n]*\n(\d{1,2}:\d{2})/,
+    /入館予定時刻[^\n]*\n(\d{1,2}:\d{2})/,
+  ]);
+
+  const exitTime = extractAny(text, [
+    /退館予定時刻[^\n]*\n[^\n]*\n(\d{1,2}:\d{2})/,
+    /Scheduled Exit Time[^\n]*\n[^\n]*\n(\d{1,2}:\d{2})/,
+    /退館予定時刻[^\n]*\n(\d{1,2}:\d{2})/,
+  ]);
+
+  const entryType = extractAny(text, [
+    /(連続入館|断続入館|両方)/,
+    /(Continuous Entry|Intermittent Entry|Both)/,
+  ]);
+
+  const purpose = extractAny(text, [
+    /入館目的[^\n]*\n([^\n]+)/,
+    /Purpose of Entry[^\n]*\n([^\n]+)/,
+  ]);
+
+  const accessArea = extractAccessArea(text);
+
+  const visitors = extractVisitors(text, applicantCompany);
+
+  const data = {
+    fileName:        pdfFile.getName(),
+    processedAt:     new Date().toLocaleString('ja-JP'),
+    applicantCompany,
+    applicantName,
+    applicantPhone,
+    startDate,
+    endDate,
+    entryTime,
+    exitTime,
+    entryType,
+    purpose,
+    accessArea,
+    visitors,
   };
 
-  // リトライ付きAPIコール（最大3回、429エラー時は30秒待機）
-  let response;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    response = UrlFetchApp.fetch(url, {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true,
-    });
-    if (response.getResponseCode() === 200) break;
+  Logger.log('=== 解析結果 ===');
+  Logger.log('申請者: ' + applicantCompany + ' / ' + applicantName);
+  Logger.log('期間: ' + startDate + '～' + endDate + ' ' + entryTime + '～' + exitTime);
+  Logger.log('入室箇所: ' + accessArea);
+  Logger.log('入館者数: ' + visitors.length);
+  visitors.forEach((v, i) => Logger.log('  ' + (i+1) + '. ' + v.company + ' / ' + v.name + ' / ' + v.phone));
 
-    const errBody = JSON.parse(response.getContentText());
-    if (errBody.error && errBody.error.code === 429) {
-      Logger.log('レート制限のため ' + (attempt * 30) + '秒待機... (' + attempt + '/3)');
-      Utilities.sleep(attempt * 30 * 1000);
-    } else {
-      break;
+  return data;
+}
+
+// ==========================================
+// 複数パターンで順に試して最初にマッチした値を返す
+// ==========================================
+function extractAny(text, patterns) {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && match[1] && match[1].trim()) {
+      return match[1].trim();
+    }
+  }
+  return '';
+}
+
+// ==========================================
+// 入室箇所の抽出（yes/Yes チェックボックス形式 + テキスト形式に対応）
+// ==========================================
+function extractAccessArea(text) {
+  const checkPatterns = [
+    { pattern: /yes\s+1[Ff]\s*Common/i,        label: '1F共用部' },
+    { pattern: /yes\s+2[Ff]\s*Common/i,        label: '2F共用部' },
+    { pattern: /yes\s+4[Ff]\s*Common/i,        label: '4F共用部' },
+    { pattern: /yes\s+2[Ff]\s*Office/i,        label: '2Fオフィス201' },
+    { pattern: /yes\s+1[Ff]\s*Meeting.*?101/i, label: '1F会議室101' },
+    { pattern: /yes\s+1[Ff]\s*Meeting.*?102/i, label: '1F会議室102' },
+    { pattern: /yes\s+1[Ff]\s*Meeting.*?103/i, label: '1F会議室103' },
+    { pattern: /yes\s+1[Ff]\s*UPS/i,           label: '1F UPS室' },
+    { pattern: /yes\s+5[Ff]/i,                 label: '5F' },
+  ];
+
+  const found = checkPatterns.filter(d => d.pattern.test(text)).map(d => d.label);
+  if (found.length > 0) return found.join(', ');
+
+  // チェックボックス形式でない場合はテキストから抽出
+  const m = text.match(/入室箇所[^\n]*\n([\s\S]*?)(?=搬出入作業|Loading and Unloading|$)/);
+  if (m) {
+    return m[1]
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !/^yes$/i.test(l) && !/^no$/i.test(l) && !/^\*?Access Area/i.test(l))
+      .join(', ')
+      .trim();
+  }
+  return '';
+}
+
+// ==========================================
+// 入館者リストの抽出（複数行テーブル形式に対応）
+// ==========================================
+function extractVisitors(text, fallbackCompany) {
+  const visitors = [];
+
+  // 入館者情報セクションを切り出す
+  const sectionMatch = text.match(/入館者情報[\s\S]*?(?=申請状況|$)/);
+  if (!sectionMatch) {
+    // セクションが見つからない場合は申請者本人を入館者とする
+    return [];
+  }
+
+  const lines = sectionMatch[0]
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l =>
+      l &&
+      !l.startsWith('入館者情報') &&
+      !l.startsWith('Visitor Information') &&
+      !l.startsWith('入館者会社名') &&
+      !l.startsWith('Visitor Company') &&
+      !l.startsWith('取り込み') &&
+      !l.startsWith('Download') &&
+      !/^\d+$/.test(l)          // 行番号のみの行を除外
+    );
+
+  const phoneRegex = /^[\d\+][\d\-\+\(\)\s]{7,}$/;
+
+  for (let i = 0; i < lines.length; i++) {
+    const cleaned = lines[i].replace(/[\s\-\(\)]/g, '');
+    if (phoneRegex.test(lines[i].replace(/\s/g, ''))) {
+      const phone       = lines[i].trim();
+      const visitorName = i >= 1 ? lines[i - 1].trim() : '';
+      const company     = i >= 2 ? lines[i - 2].trim() : (fallbackCompany || '');
+
+      if (visitorName && !visitorName.includes('Download') && !visitorName.match(/^\d+$/)) {
+        visitors.push({
+          company: company || fallbackCompany || '',
+          name:    visitorName,
+          phone:   phone,
+        });
+      }
     }
   }
 
-  if (response.getResponseCode() !== 200) {
-    throw new Error('Gemini API エラー: ' + response.getContentText());
-  }
-
-  const result = JSON.parse(response.getContentText());
-  let jsonText = result.candidates[0].content.parts[0].text;
-  Logger.log('AI抽出結果:\n' + jsonText);
-
-  // マークダウンのコードブロックを除去
-  jsonText = jsonText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-
-  const data       = JSON.parse(jsonText);
-  data.fileName    = pdfFile.getName();
-  data.processedAt = new Date().toLocaleString('ja-JP');
-  return data;
+  return visitors;
 }
 
 // ==========================================
@@ -321,19 +430,20 @@ function extractDataWithAI(pdfFile) {
 // ==========================================
 function writeToSheets(data) {
   const ss      = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-  const period  = formatPeriod(data.period);
+  const period  = formatPeriod(data);
   const summary = [];
 
   // 入館者リストが空なら申請者本人を使う
   const visitors = (data.visitors && data.visitors.length > 0)
     ? data.visitors
-    : [{ company: data.applicant.company, name: data.applicant.name, phone: data.applicant.phone }];
+    : [{ company: data.applicantCompany, name: data.applicantName, phone: data.applicantPhone }];
 
   visitors.forEach(visitor => {
-    if (!visitor.company) visitor.company = data.applicant.company;
+    if (!visitor.company) visitor.company = data.applicantCompany;
     if (!visitor.phone)   visitor.phone   = '';
 
-    const sheetName = resolveSheet(visitor.company + ' ' + data.applicant.company);
+    // 申請者会社名も加味してシートを決定
+    const sheetName = resolveSheet(visitor.company + ' ' + data.applicantCompany);
     const sheet     = ss.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -353,11 +463,12 @@ function writeToSheets(data) {
 // ==========================================
 // 期間文字列の整形
 // ==========================================
-function formatPeriod(period) {
-  if (!period) return '';
-  let str = (period.startDate || '') + '～' + (period.endDate || '');
-  if (period.entryTime && period.exitTime) {
-    str += '\n' + period.entryTime + '～' + period.exitTime;
+function formatPeriod(data) {
+  let str = '';
+  if (data.startDate) str += data.startDate;
+  if (data.endDate)   str += '～' + data.endDate;
+  if (data.entryTime && data.exitTime) {
+    str += '\n' + data.entryTime + '～' + data.exitTime;
   }
   return str;
 }
@@ -407,7 +518,7 @@ function writeLog(fileName, status, message) {
 }
 
 // ==========================================
-// 処理済み管理
+// 処理済み管理（同じPDFの二重登録を防ぐ）
 // ==========================================
 function isAlreadyProcessed(fileId) {
   return PropertiesService.getScriptProperties().getProperty('processed_' + fileId) !== null;
@@ -421,18 +532,6 @@ function markAsProcessed(fileId, fileName) {
 function resetProcessedHistory() {
   PropertiesService.getScriptProperties().deleteAllProperties();
   SpreadsheetApp.getUi().alert('処理済み履歴をリセットしました。');
-}
-
-// ==========================================
-// 使用可能なGeminiモデルを確認（初回セットアップ時に実行してモデル名を確認）
-// ==========================================
-function listModels() {
-  const url = 'https://generativelanguage.googleapis.com/v1/models?key=' + CONFIG.GEMINI_API_KEY;
-  const res = UrlFetchApp.fetch(url);
-  const models = JSON.parse(res.getContentText()).models;
-  models
-    .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
-    .forEach(m => Logger.log(m.name));
 }
 
 // ==========================================
