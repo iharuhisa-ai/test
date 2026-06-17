@@ -514,13 +514,27 @@ function writeToSheets(data) {
     }
 
     const row = buildRow(sheetName, visitor, period, data.accessArea);
-    // 既存データの最終行の次に書き込む
-    const lastRow = Math.max(sheet.getLastRow(), 1);
-    sheet.getRange(lastRow + 1, 1, 1, row.length).setValues([row]);
+    // 氏名列の最終入力行の次に書き込む
+    const nameCol = (sheetName === '3F サンライズ') ? 6 : 2;
+    const nextRow = getNextRowByColumn(sheet, nameCol);
+    sheet.getRange(nextRow, 1, 1, row.length).setValues([row]);
     summary.push(visitor.name + ' → ' + sheetName);
   });
 
   return summary.join(', ');
+}
+
+// ==========================================
+// 指定列の最終入力行の次の行番号を返す
+// ==========================================
+function getNextRowByColumn(sheet, col) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 1) return 2; // ヘッダーのみの場合は2行目から
+  const values = sheet.getRange(1, col, lastRow, 1).getValues();
+  for (let i = values.length - 1; i >= 0; i--) {
+    if (values[i][0] !== '') return i + 2; // 次の行
+  }
+  return 2; // データなしの場合は2行目から
 }
 
 // ==========================================
