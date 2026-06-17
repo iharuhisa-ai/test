@@ -394,23 +394,42 @@ function extractAccessArea(text) {
 
 // ==========================================
 // Tenant_001 入館者リスト抽出
-// 形式: 番号付きリスト「1: CHANG CHAOCHENG」（会社名・電話番号なし）
+// 形式: 番号付きリスト（会社名・電話番号なし）
 // ==========================================
 function extractTenant001Visitors(text) {
   const visitors = [];
 
-  // 入館者情報セクションを切り出す
-  const sectionMatch = text.match(/入館者情報[\s\S]*?(?=申請状況|$)/);
-  const section = sectionMatch ? sectionMatch[0] : text;
+  // 入館者情報セクションを切り出す（なければ全体を対象）
+  const sectionMatch = text.match(/(?:入館者情報|Visitor Information)([\s\S]*?)(?=申請状況|承認|$)/i);
+  const section = sectionMatch ? sectionMatch[1] : text;
 
-  // 「番号: 氏名」または「番号. 氏名」形式を抽出
+  Logger.log('=== Tenant001 入館者セクション ===\n' + section);
+
   const lines = section.split('\n');
   for (const line of lines) {
-    const m = line.trim().match(/^(\d+)[:\.\s]+([A-Za-z][A-Za-z\s\-]{1,50})$/);
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // 「1: NAME」「1. NAME」「1 NAME」「No.1 NAME」など柔軟に対応
+    const m = trimmed.match(/^(?:No\.?\s*)?(\d+)\s*[:\.\s]\s*([A-Za-z぀-鿿][^\n]{1,60})$/);
     if (m) {
       const name = m[2].trim();
-      // ヘッダー行を除外（"Name", "Company" など短すぎる or ヘッダーワード）
-      if (name && name.length > 2 && !/^(name|company|visitor|phone)/i.test(name)) {
+      if (
+        name.length > 1 &&
+        !/^(name|company|visitor|phone|no\.|number)/i.test(name) &&
+        !/^[\d\s]+$/.test(name)
+      ) {
+        visitors.push({ company: 'サンライズ', name, phone: '' });
+      }
+    }
+  }
+
+  // セクション形式で取れなかった場合: テキスト全体から番号+名前を探す
+  if (visitors.length === 0) {
+    const allMatches = [...text.matchAll(/^(\d+)\s*[:\.\s]\s*([A-Z][A-Z\s\-]{2,50})$/gm)];
+    for (const m of allMatches) {
+      const name = m[2].trim();
+      if (!/^(NAME|COMPANY|VISITOR|PHONE)/i.test(name)) {
         visitors.push({ company: 'サンライズ', name, phone: '' });
       }
     }
@@ -495,7 +514,9 @@ function writeToSheets(data) {
     }
 
     const row = buildRow(sheetName, visitor, period, data.accessArea);
-    sheet.appendRow(row);
+    // 既存データの最終行の次に書き込む
+    const lastRow = Math.max(sheet.getLastRow(), 1);
+    sheet.getRange(lastRow + 1, 1, 1, row.length).setValues([row]);
     summary.push(visitor.name + ' → ' + sheetName);
   });
 
@@ -546,24 +567,24 @@ function buildRow(sheetName, visitor, period, accessArea) {
       return ['', '', '', '', '', visitor.name, period, '', '', ''];
 
     case 'EXEO・新菱冷熱・東急建設':
-      // 会社名 / 氏名 / 電話番号 / 期間 / ID番号 / 入館時間 / 退館時間 / カード番号 / 入室箇所
-      return [visitor.company, visitor.name, visitor.phone, period, '', '', '', '', accessArea];
+      // A:会社名 B:氏名 C:電話番号 D:期間 E:ID番号 F:入館時間 G:退館時間 H:カード番号 I:(備考) J:入室箇所
+      return [visitor.company, visitor.name, visitor.phone, period, '', '', '', '', '', accessArea];
 
     case 'PDG':
-      // 会社名 / 氏名 / 期間 / ID番号 / 入館時間 / 退館時間 / カード番号 / 入室箇所
-      return [visitor.company, visitor.name, period, '', '', '', '', accessArea];
+      // A:会社名 B:氏名 C:電話番号 D:期間 E:ID番号 F:入館時間 G:退館時間 H:カード番号 I:(備考) J:入室箇所
+      return [visitor.company, visitor.name, visitor.phone, period, '', '', '', '', '', accessArea];
 
     case 'ABC工事関係者（4F権限者）':
-      // 会社名 / 氏名 / 電話番号 / 期間 / ID番号 / 入館時間 / 退館時間 / カード番号 / 入室箇所備考
-      return [visitor.company, visitor.name, visitor.phone, period, '', '', '', '', accessArea];
+      // A:会社名 B:氏名 C:電話番号 D:期間 E:ID番号 F:入館時間 G:退館時間 H:カード番号 I:(備考) J:入室箇所
+      return [visitor.company, visitor.name, visitor.phone, period, '', '', '', '', '', accessArea];
 
     case '4F ABC':
-      // 会社名 / 氏名 / 期間 / ID番号 / 入館時間 / 退館時間 / カード番号 / 入室箇所
-      return [visitor.company, visitor.name, period, '', '', '', '', accessArea];
+      // A:会社名 B:氏名 C:電話番号 D:期間 E:ID番号 F:入館時間 G:退館時間 H:カード番号 I:(備考) J:入室箇所
+      return [visitor.company, visitor.name, visitor.phone, period, '', '', '', '', '', accessArea];
 
     default:
-      // その他: 会社名 / 氏名 / 電話番号 / 期間 / ID番号 / 入館時間 / 退館時間 / カード番号備考 / 入室箇所
-      return [visitor.company, visitor.name, visitor.phone, period, '', '', '', '', accessArea];
+      // その他: A:会社名 B:氏名 C:電話番号 D:期間 E:ID番号 F:入館時間 G:退館時間 H:カード番号 I:(備考) J:入室箇所
+      return [visitor.company, visitor.name, visitor.phone, period, '', '', '', '', '', accessArea];
   }
 }
 
