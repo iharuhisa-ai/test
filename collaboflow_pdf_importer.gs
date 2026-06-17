@@ -2,10 +2,12 @@
 // 設定（ここだけ変更してください）
 // ==========================================
 const CONFIG = {
-  // PDFを置くGoogleドライブのフォルダID
+  // PDFを一時保存するGoogleドライブのフォルダID
+  // フォルダURLの /folders/XXXXXXXX の部分
   PDF_FOLDER_ID: 'ここにフォルダIDを入力',
 
   // 書き込み先スプレッドシートID
+  // スプレッドシートURLの /d/XXXXXXXX/ の部分
   SPREADSHEET_ID: 'ここにスプレッドシートIDを入力',
 
   // シート名
@@ -18,19 +20,181 @@ const CONFIG = {
 };
 
 // ==========================================
-// メイン処理（手動実行 or トリガーで呼び出す）
+// スプレッドシート起動時にメニューを追加
+// ==========================================
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('📄 PDF取込')
+    .addItem('PDFファイルを選択して取込', 'showUploadDialog')
+    .addSeparator()
+    .addItem('フォルダ内の未処理PDFを一括取込', 'processNewPDFs')
+    .addSeparator()
+    .addItem('処理済み履歴をリセット', 'resetProcessedHistory')
+    .addToUi();
+}
+
+// ==========================================
+// ダイアログ表示（ローカルPDFを選択して取込）
+// ==========================================
+function showUploadDialog() {
+  const html = HtmlService.createHtmlOutput(`
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: 'Noto Sans JP', sans-serif; padding: 16px; color: #333; }
+    h3 { margin-top: 0; color: #4472C4; }
+    .drop-zone {
+      border: 2px dashed #4472C4; border-radius: 8px;
+      padding: 30px; text-align: center; cursor: pointer;
+      background: #f8f9ff; margin-bottom: 12px;
+    }
+    .drop-zone:hover { background: #eef0ff; }
+    #fileInput { display: none; }
+    #fileList { font-size: 13px; color: #555; margin: 8px 0; min-height: 20px; }
+    .btn-primary {
+      background: #4472C4; color: white; border: none;
+      padding: 10px 24px; border-radius: 4px; cursor: pointer; font-size: 14px;
+    }
+    .btn-secondary {
+      background: #888; color: white; border: none;
+      padding: 10px 24px; border-radius: 4px; cursor: pointer; font-size: 14px;
+      margin-left: 8px;
+    }
+    button:disabled { background: #aaa !important; cursor: not-allowed; }
+    #status { margin-top: 12px; font-size: 13px; line-height: 1.8; }
+    .ok   { color: #2e7d32; }
+    .err  { color: #c62828; }
+    .info { color: #1565c0; }
+    progress { width: 100%; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h3>📄 PDFファイルを取込</h3>
+  <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+    <div>クリックしてPDFを選択</div>
+    <div style="font-size:12px; color:#888; margin-top:6px;">複数選択可（Ctrl/Cmd+クリック）</div>
+  </div>
+  <input type="file" id="fileInput" accept=".pdf" multiple onchange="onFilesSelected(this.files)">
+  <div id="fileList">ファイルが選択されていません</div>
+  <button class="btn-primary" id="startBtn" onclick="startUpload()" disabled>取込開始</button>
+  <button class="btn-secondary" onclick="google.script.host.close()">閉じる</button>
+  <progress id="progress" max="100" value="0" style="display:none; margin-top:12px;"></progress>
+  <div id="status"></div>
+
+<script>
+  let selectedFiles = [];
+
+  function onFilesSelected(files) {
+    selectedFiles = Array.from(files).filter(f => f.type === 'application/pdf');
+    if (selectedFiles.length === 0) {
+      document.getElementById('fileList').textContent = 'PDFファイルを選択してください';
+      document.getElementById('startBtn').disabled = true;
+      return;
+    }
+    document.getElementById('fileList').innerHTML =
+      selectedFiles.map((f, i) =>
+        i + 1 + '. ' + f.name + ' (' + (f.size / 1024).toFixed(0) + 'KB)'
+      ).join('<br>');
+    document.getElementById('startBtn').disabled = false;
+  }
+
+  async function startUpload() {
+    document.getElementById('startBtn').disabled = true;
+    const progress = document.getElementById('progress');
+    const status   = document.getElementById('status');
+    progress.style.display = 'block';
+    progress.value = 0;
+    status.innerHTML = '';
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      status.innerHTML += '<span class="info">[' + (i+1) + '/' + selectedFiles.length + '] 処理中: ' + file.name + '</span><br>';
+      progress.value = Math.round((i / selectedFiles.length) * 100);
+
+      try {
+        const base64 = await toBase64(file);
+        const result = await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .uploadAndProcessPDF(base64, file.name);
+        });
+        status.innerHTML += '<span class="ok">✓ ' + file.name + ' — ' + result + '</span><br>';
+      } catch (e) {
+        status.innerHTML += '<span class="err">✗ ' + file.name + ' — ' + (e.message || e) + '</span><br>';
+      }
+    }
+
+    progress.value = 100;
+    status.innerHTML += '<br><b>すべての処理が完了しました。</b>';
+    document.getElementById('startBtn').disabled = false;
+  }
+
+  function toBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+</script>
+</body>
+</html>
+  `)
+  .setWidth(480)
+  .setHeight(460)
+  .setTitle('PDFファイル取込');
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'PDFファイル取込');
+}
+
+// ==========================================
+// ダイアログから呼ばれる処理
+// Base64のPDFを受け取り → Drive保存 → 抽出 → シート記入
+// ==========================================
+function uploadAndProcessPDF(base64Data, fileName) {
+  const blob    = Utilities.newBlob(Utilities.base64Decode(base64Data), MimeType.PDF, fileName);
+  const folder  = DriveApp.getFolderById(CONFIG.PDF_FOLDER_ID);
+  const pdfFile = folder.createFile(blob);
+
+  try {
+    if (isAlreadyProcessed(pdfFile.getId())) {
+      pdfFile.setTrashed(true);
+      return 'スキップ（処理済み）';
+    }
+    const data = extractDataFromPDF(pdfFile);
+    writeToSpreadsheet(data);
+    markAsProcessed(pdfFile.getId(), fileName);
+    writeLog(fileName, '成功', '入館者 ' + data.visitors.length + ' 名');
+
+    if (CONFIG.DONE_FOLDER_ID) {
+      const doneFolder = DriveApp.getFolderById(CONFIG.DONE_FOLDER_ID);
+      doneFolder.addFile(pdfFile);
+      folder.removeFile(pdfFile);
+    }
+    return '完了 — 入館者 ' + data.visitors.length + ' 名を記入しました';
+
+  } catch (e) {
+    pdfFile.setTrashed(true);
+    writeLog(fileName, 'エラー', e.message);
+    throw new Error(e.message);
+  }
+}
+
+// ==========================================
+// フォルダ内の未処理PDFを一括取込（メニューまたはトリガーから実行）
 // ==========================================
 function processNewPDFs() {
-  const folder = DriveApp.getFolderById(CONFIG.PDF_FOLDER_ID);
-  const files  = folder.getFilesByType(MimeType.PDF);
-
-  // 未処理ファイルを全件収集
+  const folder   = DriveApp.getFolderById(CONFIG.PDF_FOLDER_ID);
+  const files    = folder.getFilesByType(MimeType.PDF);
   const allFiles = [];
+
   while (files.hasNext()) {
     const f = files.next();
-    if (!isAlreadyProcessed(f.getId())) {
-      allFiles.push(f);
-    }
+    if (!isAlreadyProcessed(f.getId())) allFiles.push(f);
   }
 
   if (allFiles.length === 0) {
@@ -38,62 +202,55 @@ function processNewPDFs() {
     return;
   }
 
-  Logger.log(`処理対象: ${allFiles.length} 件`);
+  Logger.log('処理対象: ' + allFiles.length + ' 件');
 
   let successCount = 0;
   let errorCount   = 0;
 
   allFiles.forEach((file, index) => {
-    Logger.log(`[${index + 1}/${allFiles.length}] 処理中: ${file.getName()}`);
+    Logger.log('[' + (index + 1) + '/' + allFiles.length + '] 処理中: ' + file.getName());
     try {
       const data = extractDataFromPDF(file);
-      if (data) {
-        writeToSpreadsheet(data);
-        markAsProcessed(file.getId(), file.getName());
+      writeToSpreadsheet(data);
+      markAsProcessed(file.getId(), file.getName());
 
-        // 処理済みフォルダへ移動
-        if (CONFIG.DONE_FOLDER_ID) {
-          const doneFolder = DriveApp.getFolderById(CONFIG.DONE_FOLDER_ID);
-          doneFolder.addFile(file);
-          folder.removeFile(file);
-        }
-
-        successCount++;
-        writeLog(file.getName(), '成功', `入館者 ${data.visitors.length} 名`);
-        Logger.log(`  → 完了 (入館者 ${data.visitors.length} 名)`);
+      if (CONFIG.DONE_FOLDER_ID) {
+        const doneFolder = DriveApp.getFolderById(CONFIG.DONE_FOLDER_ID);
+        doneFolder.addFile(file);
+        folder.removeFile(file);
       }
+      successCount++;
+      writeLog(file.getName(), '成功', '入館者 ' + data.visitors.length + ' 名');
+      Logger.log('  → 完了（入館者 ' + data.visitors.length + ' 名）');
     } catch (e) {
       errorCount++;
       writeLog(file.getName(), 'エラー', e.message);
-      Logger.log(`  → エラー: ${e.message}`);
+      Logger.log('  → エラー: ' + e.message);
     }
 
-    // Drive API の過負荷を避けるため少し待機
     if (index < allFiles.length - 1) Utilities.sleep(1500);
   });
 
-  Logger.log(`完了 — 成功: ${successCount} 件 / エラー: ${errorCount} 件`);
+  Logger.log('完了 — 成功: ' + successCount + ' 件 / エラー: ' + errorCount + ' 件');
 }
 
 // ==========================================
 // PDFからデータ抽出
 // ==========================================
 function extractDataFromPDF(pdfFile) {
-  // PDFをGoogleドキュメントに変換してテキスト取得
   const tempDoc = Drive.Files.copy(
     { title: '__temp__' + pdfFile.getId(), mimeType: MimeType.GOOGLE_DOCS },
     pdfFile.getId(),
     { convert: true }
   );
 
-  Utilities.sleep(2000); // 変換完了待ち
+  Utilities.sleep(2000);
 
   let text = '';
   try {
-    const doc = DocumentApp.openById(tempDoc.id);
-    text = doc.getBody().getText();
+    text = DocumentApp.openById(tempDoc.id).getBody().getText();
   } finally {
-    DriveApp.getFileById(tempDoc.id).setTrashed(true); // 必ず一時ファイルを削除
+    DriveApp.getFileById(tempDoc.id).setTrashed(true);
   }
 
   Logger.log('--- 抽出テキスト ---\n' + text + '\n---');
@@ -133,10 +290,10 @@ function extractField(text, regex) {
 // ==========================================
 function extractAccessArea(text) {
   const definitions = [
-    { pattern: /yes\s+1[Ff]\s*Common/i,   label: '1F共用部' },
-    { pattern: /yes\s+2[Ff]\s*Common/i,   label: '2F共用部' },
-    { pattern: /yes\s+4[Ff]\s*Common/i,   label: '4F共用部' },
-    { pattern: /yes\s+2[Ff]\s*Office/i,   label: '2Fオフィス201' },
+    { pattern: /yes\s+1[Ff]\s*Common/i,        label: '1F共用部' },
+    { pattern: /yes\s+2[Ff]\s*Common/i,        label: '2F共用部' },
+    { pattern: /yes\s+4[Ff]\s*Common/i,        label: '4F共用部' },
+    { pattern: /yes\s+2[Ff]\s*Office/i,        label: '2Fオフィス201' },
     { pattern: /yes\s+1[Ff]\s*Meeting.*?101/i, label: '1F会議室101' },
     { pattern: /yes\s+1[Ff]\s*Meeting.*?102/i, label: '1F会議室102' },
     { pattern: /yes\s+1[Ff]\s*Meeting.*?103/i, label: '1F会議室103' },
@@ -145,11 +302,10 @@ function extractAccessArea(text) {
   const found = definitions.filter(d => d.pattern.test(text)).map(d => d.label);
   if (found.length > 0) return found.join(', ');
 
-  // フォールバック: セクション全体から最初の意味ある行を取得
   const m = text.match(/入室箇所[\s\S]*?(?=搬出入作業)/);
   if (m) {
     return m[0]
-      .replace(/入室箇所[^\n]*/,'')
+      .replace(/入室箇所[^\n]*/, '')
       .split('\n')
       .map(l => l.trim())
       .filter(l => l && !/^yes$/i.test(l) && !/^no$/i.test(l))
@@ -164,8 +320,6 @@ function extractAccessArea(text) {
 // ==========================================
 function extractVisitors(text) {
   const visitors = [];
-
-  // 入館者情報セクションを切り出す
   const sectionMatch = text.match(/入館者情報[\s\S]*?(?=申請状況|$)/);
   if (!sectionMatch) return visitors;
 
@@ -177,18 +331,15 @@ function extractVisitors(text) {
   const phoneRegex = /^[\d\+][\d\-\+\s]{7,}$/;
 
   for (let i = 0; i < lines.length; i++) {
-    const cleaned = lines[i].replace(/\s/g, '');
-    if (phoneRegex.test(cleaned)) {
+    if (phoneRegex.test(lines[i].replace(/\s/g, ''))) {
       const phone       = lines[i].trim();
       const visitorName = i >= 1 ? lines[i - 1].trim() : '';
       const company     = i >= 2 ? lines[i - 2].trim() : '';
-
       if (visitorName && !visitorName.includes('Download') && !visitorName.match(/^\d+$/)) {
         visitors.push({ company, name: visitorName, phone });
       }
     }
   }
-
   return visitors;
 }
 
@@ -198,31 +349,24 @@ function extractVisitors(text) {
 function writeToSpreadsheet(data) {
   const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
 
-  // --- 申請一覧シート ---
   const appSheet = getOrCreateSheet(ss, CONFIG.SHEET_APPLICATIONS, [
     'ファイル名', '申請者会社名', '申請者氏名', '申請者電話番号',
     '入館開始日', '入館終了日', '入館予定時刻', '退館予定時刻',
     '連続断続区分', 'オーソライズドカード', '入館目的', '入室箇所',
     '搬出入作業', '火気危険物', '申請状況', '処理日時',
   ]);
-
   appSheet.appendRow([
-    data.fileName,   data.company,   data.name,     data.phone,
-    data.startDate,  data.endDate,   data.entryTime, data.exitTime,
-    data.entryType,  data.authorizedCard, data.purpose, data.accessArea,
-    data.loadingWork, data.hazardous, data.status,   data.processedAt,
+    data.fileName,      data.company,       data.name,          data.phone,
+    data.startDate,     data.endDate,       data.entryTime,     data.exitTime,
+    data.entryType,     data.authorizedCard, data.purpose,      data.accessArea,
+    data.loadingWork,   data.hazardous,     data.status,        data.processedAt,
   ]);
 
-  // --- 入館者一覧シート ---
   const visitorSheet = getOrCreateSheet(ss, CONFIG.SHEET_VISITORS, [
     'ファイル名', '申請者会社名', '入館開始日', '入館者会社名', '入館者氏名', '入館者電話番号',
   ]);
-
   data.visitors.forEach(v => {
-    visitorSheet.appendRow([
-      data.fileName, data.company, data.startDate,
-      v.company, v.name, v.phone,
-    ]);
+    visitorSheet.appendRow([data.fileName, data.company, data.startDate, v.company, v.name, v.phone]);
   });
 }
 
@@ -230,8 +374,8 @@ function writeToSpreadsheet(data) {
 // ログシートへの書き込み
 // ==========================================
 function writeLog(fileName, status, message) {
-  const ss        = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-  const logSheet  = getOrCreateSheet(ss, CONFIG.SHEET_LOG, ['処理日時', 'ファイル名', '状況', 'メッセージ']);
+  const ss       = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const logSheet = getOrCreateSheet(ss, CONFIG.SHEET_LOG, ['処理日時', 'ファイル名', '状況', 'メッセージ']);
   logSheet.appendRow([new Date().toLocaleString('ja-JP'), fileName, status, message]);
 }
 
@@ -254,22 +398,21 @@ function getOrCreateSheet(ss, name, headers) {
 }
 
 // ==========================================
-// 処理済み管理（PropertiesServiceで記録）
+// 処理済み管理（同じPDFの二重登録を防ぐ）
 // ==========================================
 function isAlreadyProcessed(fileId) {
-  const props = PropertiesService.getScriptProperties();
-  return props.getProperty('processed_' + fileId) !== null;
+  return PropertiesService.getScriptProperties().getProperty('processed_' + fileId) !== null;
 }
 
 function markAsProcessed(fileId, fileName) {
-  const props = PropertiesService.getScriptProperties();
-  props.setProperty('processed_' + fileId, new Date().toISOString() + ' | ' + fileName);
+  PropertiesService.getScriptProperties()
+    .setProperty('processed_' + fileId, new Date().toISOString() + ' | ' + fileName);
 }
 
-// 処理済み記録をリセット（再処理したい場合に手動実行）
+// 処理済み記録をリセット（再処理したい場合にメニューから実行）
 function resetProcessedHistory() {
   PropertiesService.getScriptProperties().deleteAllProperties();
-  Logger.log('処理済み履歴をリセットしました。');
+  SpreadsheetApp.getUi().alert('処理済み履歴をリセットしました。');
 }
 
 // ==========================================
