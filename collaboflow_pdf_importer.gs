@@ -13,25 +13,36 @@ const CONFIG = {
 };
 
 // ==========================================
-// 会社名キーワード → シート振り分けルール
-// 新しい会社を追加する場合は keywords に追記してください
+// シート振り分けルール
+// filenameKeywords: ファイル名で先に判定（会社名より優先）
+// keywords        : 会社名で判定
 // ==========================================
 const SHEET_ROUTING = [
+  // ── ファイル名ベース（Tenant申請書）──
   {
-    sheet: 'EXEO・新菱冷熱・東急建設',
-    keywords: ['エクシオ', 'exeo', '新菱', '東急建設', 'デルタ電子', 'delta', 'SEC齋藤'],
+    sheet:            '3F サンライズ',
+    filenameKeywords: ['tenant_001', 'tenant001'],
   },
   {
-    sheet: 'PDG',
-    keywords: ['PDG', 'ターナー', 'Townsend', 'NGK', '鴻池', 'セキュリティーアウトカム'],
+    sheet:            'ABC工事関係者（4F権限者）',
+    filenameKeywords: ['tenant_002', 'tenant002'],
+  },
+  // ── 会社名ベース（通常申請書）──
+  {
+    sheet:    'EXEO・新菱冷熱・東急建設',
+    keywords: ['エクシオ', 'exeo', '新菱', '東急建設', 'デルタ電子', 'delta', 'sec齋藤'],
   },
   {
-    sheet: 'ABC工事関係者（4F権限者）',
-    keywords: ['H3C', 'Wesco', 'Anixter', 'eXtrreak', 'Alibaba'],
+    sheet:    'PDG',
+    keywords: ['pdg', 'ターナー', 'townsend', 'ngk', '鴻池', 'セキュリティーアウトカム'],
   },
   {
-    sheet: '4F ABC',
-    keywords: ['Zenlayer'],
+    sheet:    'ABC工事関係者（4F権限者）',
+    keywords: ['h3c', 'wesco', 'anixter', 'extrreak', 'alibaba'],
+  },
+  {
+    sheet:    '4F ABC',
+    keywords: ['zenlayer'],
   },
   // 上記に一致しない場合は「その他」へ
 ];
@@ -229,6 +240,12 @@ function processNewPDFs() {
 // PDF → Googleドキュメント変換でテキスト抽出（無料・Drive API使用）
 // ==========================================
 function extractDataFromPDF(pdfFile) {
+  const fileName = pdfFile.getName();
+
+  // ファイル名からPDF種別を判定
+  const isTenant001 = /tenant.?001/i.test(fileName);
+  const isTenant002 = /tenant.?002/i.test(fileName);
+
   // PDFをGoogleドキュメントに変換
   const tempDoc = Drive.Files.copy(
     { title: '__temp__' + pdfFile.getId(), mimeType: MimeType.GOOGLE_DOCS },
@@ -291,22 +308,18 @@ function extractDataFromPDF(pdfFile) {
     /退館予定時刻[^\n]*\n(\d{1,2}:\d{2})/,
   ]);
 
-  const entryType = extractAny(text, [
-    /(連続入館|断続入館|両方)/,
-    /(Continuous Entry|Intermittent Entry|Both)/,
-  ]);
-
-  const purpose = extractAny(text, [
-    /入館目的[^\n]*\n([^\n]+)/,
-    /Purpose of Entry[^\n]*\n([^\n]+)/,
-  ]);
-
   const accessArea = extractAccessArea(text);
 
-  const visitors = extractVisitors(text, applicantCompany);
+  // Tenant_001: 番号付きリスト形式（会社名・電話番号なし）
+  // Tenant_002/通常: 電話番号ベースの解析
+  const visitors = isTenant001
+    ? extractTenant001Visitors(text)
+    : extractVisitors(text, applicantCompany);
 
   const data = {
-    fileName:        pdfFile.getName(),
+    fileName,
+    isTenant001,
+    isTenant002,
     processedAt:     new Date().toLocaleString('ja-JP'),
     applicantCompany,
     applicantName,
@@ -315,13 +328,12 @@ function extractDataFromPDF(pdfFile) {
     endDate,
     entryTime,
     exitTime,
-    entryType,
-    purpose,
     accessArea,
     visitors,
   };
 
   Logger.log('=== 解析結果 ===');
+  Logger.log('種別: ' + (isTenant001 ? 'Tenant001(サンライズ)' : isTenant002 ? 'Tenant002(ABC)' : '通常'));
   Logger.log('申請者: ' + applicantCompany + ' / ' + applicantName);
   Logger.log('期間: ' + startDate + '～' + endDate + ' ' + entryTime + '～' + exitTime);
   Logger.log('入室箇所: ' + accessArea);
@@ -349,15 +361,19 @@ function extractAny(text, patterns) {
 // ==========================================
 function extractAccessArea(text) {
   const checkPatterns = [
-    { pattern: /yes\s+1[Ff]\s*Common/i,        label: '1F共用部' },
-    { pattern: /yes\s+2[Ff]\s*Common/i,        label: '2F共用部' },
-    { pattern: /yes\s+4[Ff]\s*Common/i,        label: '4F共用部' },
-    { pattern: /yes\s+2[Ff]\s*Office/i,        label: '2Fオフィス201' },
+    // Tenant_001 形式（CollaborFlow UI）
+    { pattern: /yes\s+DH307/i,               label: 'DH307' },
+    { pattern: /yes\s+DH308/i,               label: 'DH308' },
+    // 通常申請書形式
+    { pattern: /yes\s+1[Ff]\s*Common/i,      label: '1F共用部' },
+    { pattern: /yes\s+2[Ff]\s*Common/i,      label: '2F共用部' },
+    { pattern: /yes\s+4[Ff]\s*Common/i,      label: '4F共用部' },
+    { pattern: /yes\s+2[Ff]\s*Office/i,      label: '2Fオフィス201' },
     { pattern: /yes\s+1[Ff]\s*Meeting.*?101/i, label: '1F会議室101' },
     { pattern: /yes\s+1[Ff]\s*Meeting.*?102/i, label: '1F会議室102' },
     { pattern: /yes\s+1[Ff]\s*Meeting.*?103/i, label: '1F会議室103' },
-    { pattern: /yes\s+1[Ff]\s*UPS/i,           label: '1F UPS室' },
-    { pattern: /yes\s+5[Ff]/i,                 label: '5F' },
+    { pattern: /yes\s+1[Ff]\s*UPS/i,         label: '1F UPS室' },
+    { pattern: /yes\s+5[Ff]/i,               label: '5F' },
   ];
 
   const found = checkPatterns.filter(d => d.pattern.test(text)).map(d => d.label);
@@ -377,17 +393,41 @@ function extractAccessArea(text) {
 }
 
 // ==========================================
-// 入館者リストの抽出（複数行テーブル形式に対応）
+// Tenant_001 入館者リスト抽出
+// 形式: 番号付きリスト「1: CHANG CHAOCHENG」（会社名・電話番号なし）
+// ==========================================
+function extractTenant001Visitors(text) {
+  const visitors = [];
+
+  // 入館者情報セクションを切り出す
+  const sectionMatch = text.match(/入館者情報[\s\S]*?(?=申請状況|$)/);
+  const section = sectionMatch ? sectionMatch[0] : text;
+
+  // 「番号: 氏名」または「番号. 氏名」形式を抽出
+  const lines = section.split('\n');
+  for (const line of lines) {
+    const m = line.trim().match(/^(\d+)[:\.\s]+([A-Za-z][A-Za-z\s\-]{1,50})$/);
+    if (m) {
+      const name = m[2].trim();
+      // ヘッダー行を除外（"Name", "Company" など短すぎる or ヘッダーワード）
+      if (name && name.length > 2 && !/^(name|company|visitor|phone)/i.test(name)) {
+        visitors.push({ company: 'サンライズ', name, phone: '' });
+      }
+    }
+  }
+
+  return visitors;
+}
+
+// ==========================================
+// 通常申請書の入館者リスト抽出（電話番号ベース）
 // ==========================================
 function extractVisitors(text, fallbackCompany) {
   const visitors = [];
 
   // 入館者情報セクションを切り出す
   const sectionMatch = text.match(/入館者情報[\s\S]*?(?=申請状況|$)/);
-  if (!sectionMatch) {
-    // セクションが見つからない場合は申請者本人を入館者とする
-    return [];
-  }
+  if (!sectionMatch) return [];
 
   const lines = sectionMatch[0]
     .split('\n')
@@ -400,13 +440,12 @@ function extractVisitors(text, fallbackCompany) {
       !l.startsWith('Visitor Company') &&
       !l.startsWith('取り込み') &&
       !l.startsWith('Download') &&
-      !/^\d+$/.test(l)          // 行番号のみの行を除外
+      !/^\d+$/.test(l)
     );
 
   const phoneRegex = /^[\d\+][\d\-\+\(\)\s]{7,}$/;
 
   for (let i = 0; i < lines.length; i++) {
-    const cleaned = lines[i].replace(/[\s\-\(\)]/g, '');
     if (phoneRegex.test(lines[i].replace(/\s/g, ''))) {
       const phone       = lines[i].trim();
       const visitorName = i >= 1 ? lines[i - 1].trim() : '';
@@ -442,9 +481,12 @@ function writeToSheets(data) {
     if (!visitor.company) visitor.company = data.applicantCompany;
     if (!visitor.phone)   visitor.phone   = '';
 
-    // 申請者会社名も加味してシートを決定
-    const sheetName = resolveSheet(visitor.company + ' ' + data.applicantCompany);
-    const sheet     = ss.getSheetByName(sheetName);
+    // ファイル名を最優先にシートを決定（Tenant_001/002 判定）
+    const sheetName = resolveSheet(
+      visitor.company + ' ' + data.applicantCompany,
+      data.fileName
+    );
+    const sheet = ss.getSheetByName(sheetName);
 
     if (!sheet) {
       Logger.log('シートが見つかりません: ' + sheetName);
@@ -474,12 +516,20 @@ function formatPeriod(data) {
 }
 
 // ==========================================
-// 会社名からシートを特定
+// 会社名 or ファイル名からシートを特定
 // ==========================================
-function resolveSheet(companyText) {
+function resolveSheet(companyText, fileName) {
+  // ファイル名ベースを先に評価
+  const fn = (fileName || '').toLowerCase();
+  for (const rule of SHEET_ROUTING) {
+    if (rule.filenameKeywords && rule.filenameKeywords.some(kw => fn.includes(kw))) {
+      return rule.sheet;
+    }
+  }
+  // 会社名ベース
   const text = (companyText || '').toLowerCase();
   for (const rule of SHEET_ROUTING) {
-    if (rule.keywords.some(kw => text.includes(kw.toLowerCase()))) {
+    if (rule.keywords && rule.keywords.some(kw => text.includes(kw))) {
       return rule.sheet;
     }
   }
@@ -490,15 +540,30 @@ function resolveSheet(companyText) {
 // シートごとの列順で行データを作成
 // ==========================================
 function buildRow(sheetName, visitor, period, accessArea) {
-  // 電話番号列があるシート
-  const withPhone = ['EXEO・新菱冷熱・東急建設', 'ABC工事関係者（4F権限者）', 'その他'];
+  switch (sheetName) {
+    case '3F サンライズ':
+      // ステータス / MGRチェック / 一人目 / 二人目 / 申請書内番号 / 氏名 / 期間 / ID番号 / 入館時間 / 退館時間
+      return ['', '', '', '', '', visitor.name, period, '', '', ''];
 
-  if (withPhone.includes(sheetName)) {
-    // 会社名 / 氏名 / 電話番号 / 期間 / ID番号 / 入館時間 / 退館時間 / カード番号 / 入室箇所
-    return [visitor.company, visitor.name, visitor.phone, period, '', '', '', '', accessArea];
-  } else {
-    // 会社名 / 氏名 / 期間 / ID番号 / 入館時間 / 退館時間 / カード番号 / 入室箇所
-    return [visitor.company, visitor.name, period, '', '', '', '', accessArea];
+    case 'EXEO・新菱冷熱・東急建設':
+      // 会社名 / 氏名 / 電話番号 / 期間 / ID番号 / 入館時間 / 退館時間 / カード番号 / 入室箇所
+      return [visitor.company, visitor.name, visitor.phone, period, '', '', '', '', accessArea];
+
+    case 'PDG':
+      // 会社名 / 氏名 / 期間 / ID番号 / 入館時間 / 退館時間 / カード番号 / 入室箇所
+      return [visitor.company, visitor.name, period, '', '', '', '', accessArea];
+
+    case 'ABC工事関係者（4F権限者）':
+      // 会社名 / 氏名 / 電話番号 / 期間 / ID番号 / 入館時間 / 退館時間 / カード番号 / 入室箇所備考
+      return [visitor.company, visitor.name, visitor.phone, period, '', '', '', '', accessArea];
+
+    case '4F ABC':
+      // 会社名 / 氏名 / 期間 / ID番号 / 入館時間 / 退館時間 / カード番号 / 入室箇所
+      return [visitor.company, visitor.name, period, '', '', '', '', accessArea];
+
+    default:
+      // その他: 会社名 / 氏名 / 電話番号 / 期間 / ID番号 / 入館時間 / 退館時間 / カード番号備考 / 入室箇所
+      return [visitor.company, visitor.name, visitor.phone, period, '', '', '', '', accessArea];
   }
 }
 
