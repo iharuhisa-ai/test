@@ -20,7 +20,7 @@ const CONFIG = {
 const SHEET_ROUTING = [
   // ── ファイル名ベース（Tenant申請書）──
   {
-    sheet:            '3F サンライズ',
+    sheet:            'サンライズ',
     filenameKeywords: ['tenant_001', 'tenant001'],
   },
   {
@@ -515,7 +515,7 @@ function writeToSheets(data) {
 
     const row = buildRow(sheetName, visitor, period, data.accessArea);
     // 氏名列の最終入力行の次に書き込む
-    const nameCol = (sheetName === '3F サンライズ') ? 6 : 2;
+    const nameCol = (sheetName === 'サンライズ') ? 6 : 2;
     const nextRow = getNextRowByColumn(sheet, nameCol);
     sheet.getRange(nextRow, 1, 1, row.length).setValues([row]);
     summary.push(visitor.name + ' → ' + sheetName);
@@ -576,7 +576,7 @@ function resolveSheet(companyText, fileName) {
 // ==========================================
 function buildRow(sheetName, visitor, period, accessArea) {
   switch (sheetName) {
-    case '3F サンライズ':
+    case 'サンライズ':
       // ステータス / MGRチェック / 一人目 / 二人目 / 申請書内番号 / 氏名 / 期間 / ID番号 / 入館時間 / 退館時間
       return ['', '', '', '', '', visitor.name, period, '', '', ''];
 
