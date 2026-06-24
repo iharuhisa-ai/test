@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>データセンター警備提案書 ～au Starlink活用による災害対応強化～</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif; background: #0a0e1a; color: #e0e6f0; }
+
+    /* スライド共通 */
+    .slide {
+      width: 100%;
+      min-height: 100vh;
+      padding: 60px 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      page-break-after: always;
+      border-bottom: 2px solid #1e2a3a;
+    }
+
+    /* カラーテーマ */
+    :root {
+      --primary: #00a8ff;
+      --accent: #ff6b35;
+      --green: #00d4aa;
+      --dark-card: #111827;
+      --border: #1e3a5f;
+    }
+
+    /* タイトルスライド */
+    .slide-title {
+      background: linear-gradient(135deg, #050d1a 0%, #0a1628 50%, #061020 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .slide-title::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -10%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(0,168,255,0.08) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .slide-title::after {
+      content: '';
+      position: absolute;
+      bottom: -20%;
+      left: 20%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(255,107,53,0.06) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .title-badge {
+      display: inline-block;
+      background: rgba(0,168,255,0.15);
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      padding: 6px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      letter-spacing: 2px;
+      margin-bottom: 30px;
+    }
+    .title-main {
+      font-size: 48px;
+      font-weight: 900;
+      line-height: 1.3;
+      margin-bottom: 20px;
+      background: linear-gradient(90deg, #ffffff, var(--primary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .title-sub {
+      font-size: 22px;
+      color: #8aa4c8;
+      margin-bottom: 50px;
+      line-height: 1.6;
+    }
+    .title-meta {
+      display: flex;
+      gap: 40px;
+      border-top: 1px solid #1e3a5f;
+      padding-top: 30px;
+      margin-top: 20px;
+    }
+    .title-meta-item { font-size: 14px; color: #6a8aaa; }
+    .title-meta-item span { color: #e0e6f0; font-weight: 600; }
+
+    /* セクションヘッダー */
+    .slide-header {
+      background: linear-gradient(135deg, #0a1628, #111827);
+    }
+    .section-num {
+      font-size: 80px;
+      font-weight: 900;
+      color: rgba(0,168,255,0.1);
+      line-height: 1;
+      margin-bottom: -10px;
+    }
+    .section-title {
+      font-size: 42px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 15px;
+    }
+    .section-desc {
+      font-size: 18px;
+      color: #6a8aaa;
+      border-left: 4px solid var(--primary);
+      padding-left: 16px;
+    }
+
+    /* コンテンツスライド */
+    .slide-content {
+      background: linear-gradient(160deg, #0a1220, #0d1828);
+    }
+    .content-title {
+      font-size: 30px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 40px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #1e3a5f;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .content-title::before {
+      content: '';
+      width: 6px;
+      height: 32px;
+      background: linear-gradient(180deg, var(--primary), var(--accent));
+      border-radius: 3px;
+    }
+
+    /* カード */
+    .card-grid {
+      display: grid;
+      gap: 24px;
+    }
+    .card-grid-2 { grid-template-columns: 1fr 1fr; }
+    .card-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .card {
+      background: var(--dark-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+    }
+    .card-icon { font-size: 36px; margin-bottom: 16px; }
+    .card-title { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 10px; }
+    .card-body { font-size: 15px; color: #8aa4c8; line-height: 1.8; }
+
+    /* 問題提起カード */
+    .problem-card {
+      background: rgba(255,60,60,0.05);
+      border: 1px solid rgba(255,60,60,0.3);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .problem-card .card-title { color: #ff6060; }
+
+    /* 強調ボックス */
+    .highlight-box {
+      background: linear-gradient(135deg, rgba(0,168,255,0.1), rgba(0,212,170,0.05));
+      border: 1px solid rgba(0,168,255,0.4);
+      border-radius: 12px;
+      padding: 30px;
+      margin: 24px 0;
+    }
+    .highlight-box-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 12px;
+    }
+    .highlight-box-body { font-size: 16px; color: #c0d4e8; line-height: 1.9; }
+
+    /* タイムライン */
+    .timeline { display: flex; flex-direction: column; gap: 0; }
+    .timeline-item {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      padding: 20px 0;
+      border-bottom: 1px solid #1e3a5f;
+    }
+    .timeline-item:last-child { border-bottom: none; }
+    .timeline-dot {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), #0066cc);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .timeline-content { flex: 1; }
+    .timeline-label { font-size: 12px; color: var(--primary); margin-bottom: 4px; letter-spacing: 1px; }
+    .timeline-title { font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 6px; }
+    .timeline-body { font-size: 14px; color: #8aa4c8; line-height: 1.7; }
+
+    /* 比較テーブル */
+    .compare-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    .compare-table th {
+      background: rgba(0,168,255,0.15);
+      color: var(--primary);
+      padding: 14px 20px;
+      text-align: center;
+      font-size: 15px;
+      border: 1px solid var(--border);
+    }
+    .compare-table td {
+      padding: 14px 20px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      color: #c0d4e8;
+      text-align: center;
+      background: var(--dark-card);
+    }
+    .compare-table tr:nth-child(even) td { background: #0d1828; }
+    .ok { color: var(--green); font-weight: 700; }
+    .ng { color: #ff6060; font-weight: 700; }
+    .partial { color: #ffaa44; font-weight: 700; }
+
+    /* ステップフロー */
+    .step-flow { display: flex; align-items: center; gap: 0; }
+    .step-box {
+      flex: 1;
+      background: var(--dark-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px 16px;
+      text-align: center;
+    }
+    .step-num { font-size: 11px; color: var(--primary); letter-spacing: 2px; margin-bottom: 8px; }
+    .step-title { font-size: 16px; font-weight: 700; color: #ffffff; margin-bottom: 8px; }
+    .step-body { font-size: 13px; color: #8aa4c8; line-height: 1.6; }
+    .step-arrow {
+      font-size: 24px;
+      color: var(--primary);
+      padding: 0 8px;
+      flex-shrink: 0;
+    }
+
+    /* メトリクス */
+    .metrics-row { display: flex; gap: 24px; margin: 24px 0; }
+    .metric-box {
+      flex: 1;
+      background: var(--dark-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .metric-value { font-size: 40px; font-weight: 900; color: var(--primary); line-height: 1; margin-bottom: 8px; }
+    .metric-label { font-size: 14px; color: #6a8aaa; }
+
+    /* チェックリスト */
+    .checklist { list-style: none; }
+    .checklist li {
+      padding: 12px 0;
+      border-bottom: 1px solid #1e3a5f;
+      font-size: 16px;
+      color: #c0d4e8;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      line-height: 1.7;
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist li::before { content: '✓'; color: var(--green); font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+
+    /* CTA */
+    .slide-cta {
+      background: linear-gradient(135deg, #050d1a, #0a1220);
+      text-align: center;
+    }
+    .cta-title {
+      font-size: 40px;
+      font-weight: 900;
+      color: #ffffff;
+      margin-bottom: 20px;
+    }
+    .cta-sub { font-size: 18px; color: #8aa4c8; margin-bottom: 50px; line-height: 1.8; }
+    .cta-button {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--primary), #0066cc);
+      color: #ffffff;
+      padding: 18px 50px;
+      border-radius: 50px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-decoration: none;
+      box-shadow: 0 8px 30px rgba(0,168,255,0.3);
+    }
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+      margin-top: 50px;
+    }
+    .contact-item {
+      background: var(--dark-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: left;
+    }
+    .contact-label { font-size: 12px; color: var(--primary); letter-spacing: 1px; margin-bottom: 8px; }
+    .contact-value { font-size: 15px; color: #e0e6f0; font-weight: 600; }
+
+    /* ページ番号 */
+    .page-num {
+      position: absolute;
+      bottom: 24px;
+      right: 40px;
+      font-size: 12px;
+      color: #3a5a7a;
+    }
+
+    /* 印刷用 */
+    @media print {
+      .slide { page-break-after: always; min-height: 100vh; }
+      body { background: #0a0e1a; }
+    }
+
+    /* アニメーション（ブラウザ表示用） */
+    @media screen {
+      .slide { position: relative; }
+    }
+
+    /* 赤字強調 */
+    .em { color: var(--accent); font-weight: 700; }
+    .em-blue { color: var(--primary); font-weight: 700; }
+    .em-green { color: var(--green); font-weight: 700; }
+
+    /* アーキテクチャ図 */
+    .arch-diagram {
+      background: var(--dark-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+    }
+    .arch-row { display: flex; justify-content: center; align-items: center; gap: 16px; margin: 12px 0; }
+    .arch-node {
+      background: rgba(0,168,255,0.1);
+      border: 1px solid rgba(0,168,255,0.5);
+      border-radius: 8px;
+      padding: 12px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--primary);
+    }
+    .arch-node.red {
+      background: rgba(255,107,53,0.1);
+      border-color: rgba(255,107,53,0.5);
+      color: var(--accent);
+    }
+    .arch-node.green {
+      background: rgba(0,212,170,0.1);
+      border-color: rgba(0,212,170,0.5);
+      color: var(--green);
+    }
+    .arch-arrow { color: #3a6a9a; font-size: 20px; }
+    .arch-label { font-size: 11px; color: #6a8aaa; margin-top: 4px; }
+
+    /* 価格表 */
+    .price-table { width: 100%; border-collapse: collapse; }
+    .price-table th {
+      background: rgba(0,168,255,0.15);
+      color: var(--primary);
+      padding: 12px 16px;
+      text-align: left;
+      border: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .price-table td {
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      color: #c0d4e8;
+      background: var(--dark-card);
+    }
+    .price-table .total-row td {
+      background: rgba(0,168,255,0.1);
+      color: var(--primary);
+      font-weight: 700;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== スライド 1: タイトル ===== -->
+<div class="slide slide-title" style="position:relative;">
+  <div style="position:relative;z-index:1;">
+    <div class="title-badge">PROPOSAL 2026</div>
+    <div class="title-main">
+      災害に強いデータセンター警備<br>
+      au Starlink 通信冗長化ソリューション
+    </div>
+    <div class="title-sub">
+      衛星通信×地上回線のハイブリッド構成で<br>
+      「どんな災害でも途切れない警備体制」を実現します
+    </div>
+    <div class="title-meta">
+      <div class="title-meta-item">提案日：<span>2026年6月24日</span></div>
+      <div class="title-meta-item">提案先：<span>貴社データセンター担当者様</span></div>
+      <div class="title-meta-item">作成者：<span>警備営業部</span></div>
+    </div>
+  </div>
+  <div class="page-num">1 / 12</div>
+</div>
+
+
+<!-- ===== スライド 2: 目次 ===== -->
+<div class="slide slide-content" style="position:relative;">
+  <div class="content-title">本日のご提案内容</div>
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <div class="card-icon">⚠️</div>
+      <div class="card-title">1. 現状課題の整理</div>
+      <div class="card-body">データセンター警備における通信断リスクと、既存体制の脆弱性を確認します。</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🛰️</div>
+      <div class="card-title">2. au Starlinkとは</div>
+      <div class="card-body">低軌道衛星通信の仕組みと、auサービスとしての信頼性・サポート体制をご説明します。</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔒</div>
+      <div class="card-title">3. 警備への活用提案</div>
+      <div class="card-body">通信冗長化の具体的な構成と、警備オペレーションへの組み込み方法をご提示します。</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📋</div>
+      <div class="card-title">4. 導入ステップ・費用感</div>
+      <div class="card-body">スモールスタートから段階的展開まで、導入ロードマップと概算費用をご案内します。</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📊</div>
+      <div class="card-title">5. 導入効果・実績</div>
+      <div class="card-body">定量的な効果指標と、同種施設での導入事例をご紹介します。</div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🤝</div>
+      <div class="card-title">6. 次のステップ</div>
+      <div class="card-body">トライアル提案・現地調査のご案内と、お問い合わせ先をご確認いただけます。</div>
+    </div>
+  </div>
+  <div class="page-num">2 / 12</div>
+</div>
+
+
+<!-- ===== スライド 3: 現状課題 ===== -->
+<div class="slide slide-content" style="position:relative;">
+  <div class="content-title">データセンター警備が抱える「通信断」リスク</div>
+  <div class="card-grid card-grid-3" style="margin-bottom:28px;">
+    <div class="problem-card">
+      <div class="card-icon">🌀</div>
+      <div class="card-title">自然災害による通信断</div>
+      <div class="card-body">地震・台風・大雨による地上回線の切断。光ファイバーの物理損傷は復旧に<span class="em">数日〜数週間</span>を要する。</div>
+    </div>
+    <div class="problem-card">
+      <div class="card-icon">⚡</div>
+      <div class="card-title">停電・設備障害</div>
+      <div class="card-body">長時間停電時のUPS枯渇。通信機器の電源断により<span class="em">監視カメラ・センサーが失報</span>するリスクがある。</div>
+    </div>
+    <div class="problem-card">
+      <div class="card-icon">🔌</div>
+      <div class="card-title">単一キャリア依存</div>
+      <div class="card-body">1系統の地上回線のみでは、局舎障害・ケーブル切断で<span class="em">警備センターとの通信が完全孤立</span>する。</div>
+    </div>
+  </div>
+  <div class="highlight-box">
+    <div class="highlight-box-title">⚡ 実際に起きた事例</div>
+    <div class="highlight-box-body">
+      2024年の能登半島地震では、被災地内の通信インフラが広範囲で断絶。
+      地上系回線のみに依存していた施設では<span class="em-blue">最長6日間の通信不通</span>が発生し、
+      警備の安否確認・指示系統が機能しないケースが報告された。<br>
+      データセンターにおける通信断は「設備の監視空白」となり、不正侵入・盗難・火災の早期検知が困難になる。
+    </div>
+  </div>
+  <div class="metrics-row">
+    <div class="metric-box">
+      <div class="metric-value">72<span style="font-size:20px;">時間</span></div>
+      <div class="metric-label">大規模災害時の地上回線<br>平均復旧待機時間</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-value">約<span style="font-size:24px;">3</span>倍</div>
+      <div class="metric-label">通信断時の不正侵入<br>検知遅延リスク倍率</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-value">99.9<span style="font-size:20px;">%</span></div>
+      <div class="metric-label">顧客が求める警備システム<br>稼働率（SLA水準）</div>
+    </div>
+  </div>
+  <div class="page-num">3 / 12</div>
+</div>
+
+
+<!-- ===== スライド 4: au Starlinkとは ===== -->
+<div class="slide slide-content" style="position:relative;">
+  <div class="content-title">au Starlink とは ― 低軌道衛星通信の新時代</div>
+  <div class="card-grid card-grid-2" style="margin-bottom:24px;">
+    <div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-icon">🛰️</div>
+        <div class="card-title">SpaceX Starlink × KDDI（au）</div>
+        <div class="card-body">
+          SpaceXが展開する低軌道（LEO）衛星コンステレーション（高度約550km）をKDDI（au）が日本向けサービスとして提供。
+          地上インフラに依存しない<span class="em-blue">独立した通信経路</span>を実現。
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📡</div>
+        <div class="card-title">法人向けサービスの特長</div>
+        <div class="card-body">
+          ・KDDIの法人サポート体制（SLA保証）<br>
+          ・既存auモバイル回線とのセット割<br>
+          ・導入・保守の一元窓口<br>
+          ・セキュリティ要件対応（暗号化通信）
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="arch-diagram">
+        <div style="font-size:13px;color:#6a8aaa;margin-bottom:20px;">通信経路イメージ</div>
+        <div class="arch-row">
+          <div class="arch-node">🏢 データセンター<br><span style="font-size:11px;">警備端末・センサー</span></div>
+        </div>
+        <div class="arch-row">
+          <div class="arch-node">📡 Starlinkアンテナ<br><span style="font-size:11px;">au提供ハードウェア</span></div>
+          <div style="color:#3a6a9a;font-size:13px;">＋</div>
+          <div class="arch-node red">🔌 地上光回線<br><span style="font-size:11px;">既存回線</span></div>
+        </div>
+        <div class="arch-arrow" style="text-align:center;">↕ 自動切替（フェイルオーバー）</div>
+        <div class="arch-row">
+          <div class="arch-node">🛰️ Starlink衛星群<br><span style="font-size:11px;">高度550km LEO</span></div>
+        </div>
+        <div class="arch-arrow" style="text-align:center;">↕</div>
+        <div class="arch-row">
+          <div class="arch-node green">🖥️ au ゲートウェイ<br><span style="font-size:11px;">KDDI地上局</span></div>
+        </div>
+        <div class="arch-arrow" style="text-align:center;">↕</div>
+        <div class="arch-row">
+          <div class="arch-node green">🔒 警備センター<br><span style="font-size:11px;">24時間365日監視</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card-grid card-grid-3">
+    <div class="card" style="text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:var(--primary);">20〜100<span style="font-size:16px;">Mbps</span></div>
+      <div style="font-size:13px;color:#6a8aaa;margin-top:6px;">下り通信速度</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:var(--primary);">20〜40<span style="font-size:16px;">ms</span></div>
+      <div style="font-size:13px;color:#6a8aaa;margin-top:6px;">低遅延（LEO衛星の強み）</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div style="font-size:28px;font-weight:900;color:var(--primary);">99<span style="font-size:16px;">%+</span></div>
+      <div style="font-size:13px;color:#6a8aaa;margin-top:6px;">au法人SLA可用性</div>
+    </div>
+  </div>
+  <div class="page-num">4 / 12</div>
+</div>
+
+
+<!-- ===== スライド 5: 既存手段との比較 ===== -->
+<div class="slide slide-content" style="position:relative;">
+  <div class="content-title">通信手段の比較 ― なぜ au Starlink が最適解か</div>
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>比較項目</th>
+        <th>地上光回線<br>（現状）</th>
+        <th>携帯LTE/5G<br>（モバイルルーター）</th>
+        <th>従来衛星通信<br>（静止軌道）</th>
+        <th style="background:rgba(0,168,255,0.25);color:#fff;">au Starlink<br>（提案）</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>地震・台風時の耐障害性</td>
+        <td class="ng">× 地上ケーブル切断リスク</td>
+        <td class="partial">△ 基地局が被災する場合あり</td>
+        <td class="ok">○ 地上インフラ非依存</td>
+        <td class="ok">◎ 地上インフラ完全非依存</td>
+      </tr>
+      <tr>
+        <td>通信速度</td>
+        <td class="ok">◎ 1Gbps+</td>
+        <td class="ok">○ 50〜200Mbps</td>
+        <td class="ng">× 1〜5Mbps程度</td>
+        <td class="ok">◎ 20〜100Mbps</td>
+      </tr>
+      <tr>
+        <td>遅延</td>
+        <td class="ok">◎ 1〜5ms</td>
+        <td class="ok">○ 10〜40ms</td>
+        <td class="ng">× 500〜700ms</td>
+        <td class="ok">◎ 20〜40ms</td>
+      </tr>
+      <tr>
+        <td>映像監視（HD/4K）</td>
+        <td class="ok">◎</td>
+        <td class="ok">○</td>
+        <td class="ng">× 遅延で実用不可</td>
+        <td class="ok">◎ リアルタイム対応</td>
+      </tr>
+      <tr>
+        <td>法人サポート体制</td>
+        <td class="ok">○</td>
+        <td class="partial">△ キャリア依存</td>
+        <td class="partial">△ 専門業者対応</td>
+        <td class="ok">◎ KDDI法人窓口一元化</td>
+      </tr>
+      <tr>
+        <td>導入コスト</td>
+        <td class="ok">○ 工事費のみ</td>
+        <td class="ok">◎ 安価</td>
+        <td class="ng">× 高額（100万円〜）</td>
+        <td class="ok">○ 中程度（後述）</td>
+      </tr>
+      <tr>
+        <td>冗長化バックアップ適性</td>
+        <td class="ng">× 主回線と同経路リスク</td>
+        <td class="partial">△ 基地局集中障害リスク</td>
+        <td class="ok">○</td>
+        <td class="ok">◎ 最適（異経路・高速）</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="highlight-box" style="margin-top:24px;">
+    <div class="highlight-box-title">結論</div>
+    <div class="highlight-box-body">
+      au Starlink は<span class="em-blue">「地上インフラに依存しない独立した通信経路」</span>と<span class="em-blue">「HD映像転送に耐えられる十分な速度・低遅延」</span>を両立する、現時点で警備バックアップ通信として最も実用的な選択肢です。
+    </div>
+  </div>
+  <div class="page-num">5 / 12</div>
+</div>
+
+
+<!-- ===== スライド 6: 具体的な警備活用 ===== -->
+<div class="slide slide-content" style="position:relative;">
+  <div class="content-title">具体的な活用シナリオ ― 災害発生時の通信フロー</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;">
+    <div>
+      <div style="font-size:16px;font-weight:700;color:var(--accent);margin-bottom:16px;">【現状】地上回線のみ ― 災害時</div>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-dot" style="background:linear-gradient(135deg,#ff4444,#cc0000);">🌀</div>
+          <div class="timeline-content">
+            <div class="timeline-label">発災</div>
+            <div class="timeline-title">地震・台風発生</div>
+            <div class="timeline-body">地上ケーブル切断・通信局舎損傷</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot" style="background:linear-gradient(135deg,#ff4444,#cc0000);">📵</div>
+          <div class="timeline-content">
+            <div class="timeline-label">数分後</div>
+            <div class="timeline-title">通信完全断</div>
+            <div class="timeline-body">カメラ映像・センサー情報が届かない<br>警備センターとの連絡不通</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot" style="background:linear-gradient(135deg,#ff4444,#cc0000);">⚠️</div>
+          <div class="timeline-content">
+            <div class="timeline-label">数日後</div>
+            <div class="timeline-title">施設の"監視空白"が継続</div>
+            <div class="timeline-body">不正侵入・火災の検知不能<br>顧客への報告・対応が困難</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:16px;font-weight:700;color:var(--green);margin-bottom:16px;">【提案後】Starlink冗長化 ― 災害時</div>
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-dot">🌀</div>
+          <div class="timeline-content">
+            <div class="timeline-label">発災</div>
+            <div class="timeline-title">地震・台風発生</div>
+            <div class="timeline-body">地上ケーブル切断を検知</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot" style="background:linear-gradient(135deg,var(--green),#009980);">⚡</div>
+          <div class="timeline-content">
+            <div class="timeline-label">数秒以内</div>
+            <div class="timeline-title">Starlinkへ自動フェイルオーバー</div>
+            <div class="timeline-body">ルーターが自動切替<br>警備システムの通信が継続</div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot" style="background:linear-gradient(135deg,var(--green),#009980);">🛡️</div>
+          <div class="timeline-content">
+            <div class="timeline-label">継続</div>
+            <div class="timeline-title">監視・通報機能が維持</div>
+            <div class="timeline-body">映像確認・センサー監視・緊急通報<br>すべての警備機能が継続稼働</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="highlight-box" style="margin-top:24px;">
+    <div class="highlight-box-title">🔑 対応可能な警備システム</div>
+    <div class="highlight-box-body">
+      映像監視（IP-CAM／HD・4K）　　入退室管理システム　　侵入センサー・火災報知連携　　警備員携帯端末（PTT/BoIP）　　緊急通報システム（SECOM/ALSOK連携）
+    </div>
+  </div>
+  <div class="page-num">6 / 12</div>
+</div>
+
+
+<!-- ===== スライド 7: システム構成 ===== -->
+<div class="slide slide-content" style="position:relative;">
+  <div class="content-title">推奨システム構成 ― ハイブリッド冗長化モデル</div>
+  <div class="arch-diagram" style="margin-bottom:24px;">
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:center;">
+      <div>
+        <div style="font-size:13px;color:#6a8aaa;margin-bottom:12px;text-align:center;">【平常時：地上回線メイン】</div>
+        <div class="arch-row">
+          <div class="arch-node" style="width:100%;text-align:center;">🏢 データセンター内<br>警備LAN</div>
+        </div>
+        <div class="arch-arrow" style="text-align:center;">↕</div>
+        <div class="arch-row">
+          <div class="arch-node" style="width:100%;text-align:center;">🔀 冗長化ルーター<br><span style="font-size:11px;">自動フェイルオーバー機能</span></div>
+        </div>
+        <div class="arch-arrow" style="text-align:center;">↕ メイン回線</div>
+        <div class="arch-row">
+          <div class="arch-node red" style="width:100%;text-align:center;">🔌 地上光回線<br><span style="font-size:11px;">既存インフラ</span></div>
+        </div>
+        <div class="arch-arrow" style="text-align:center;">↕</div>
+        <div class="arch-row">
+          <div class="arch-node green" style="width:100%;text-align:center;">🖥️ 警備センター<br>監視システム</div>
+        </div>
+      </div>
+      <div style="text-align:center;color:#3a6a9a;font-size:30px;">⟷</div>
+      <div>
+        <div style="font-size:13px;color:var(--green);margin-bottom:12px;text-align:center;">【障害時：Starlinkへ自動切替】</div>
+        <div class="arch-row">
+          <div class="arch-node" style="width:100%;text-align:center;">🏢 データセンター内<br>警備LAN</div>
+        </div>
+        <div class="arch-arrow" style="text-align:center;">↕</div>
+        <div class="arch-row">
+          <div class="arch-node" style="width:100%;text-align:center;">🔀 冗長化ルーター<br><span style="font-size:11px;">フェイルオーバー発動</span></div>
+        </div>
+        <div class="arch-arrow" style="text-align:center;">↕ バックアップ回線</div>
+        <div class="arch-row">
+          <div class="arch-node" style="width:100%;text-align:center;border-color:var(--green);color:var(--green);background:rgba(0,212,170,0.1);">📡 au Starlink<br><span style="font-size:11px;">衛星経由で接続維持</span></div>
+        </div>
+        <div class="arch-arrow" style="text-align:center;">↕</div>
+        <div class="arch-row">
+          <div class="arch-node green" style="width:100%;text-align:center;">🖥️ 警備センター<br>監視システム</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card-grid card-grid-3">
+    <div class="card">
+      <div class="card-title">🔀 冗長化ルーター</div>
+      <div class="card-body">WAN2ポート対応ルーター（Peplink/FortiGate等）によりメイン/バックアップを自動管理。切替時間は<span class="em-blue">5〜30秒</span>。</div>
+    </div>
+    <div class="card">
+      <div class="card-title">📡 Starlink端末設置</div>
+      <div class="card-body">屋上または建物外壁に設置。直径約60cmのアンテナ（Flat High Performance）で空が開けた場所であれば安定稼働。</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🔋 UPS連携</div>
+      <div class="card-body">Starlink端末・ルーターをUPSに接続し、停電時も数時間の通信継続を確保。完全自律型バックアップが完成。</div>
+    </div>
+  </div>
+  <div class="page-num">7 / 12</div>
+</div>
+
+
+<!-- ===== スライド 8: 導入ステップ ===== -->
+<div class="slide slide-content" style="position:relative;">
+  <div class="content-title">導入ロードマップ ― 最短2ヶ月で稼働開始</div>
+  <div class="step-flow" style="margin-bottom:32px;">
+    <div class="step-box">
+      <div class="step-num">STEP 01</div>
+      <div class="step-title">現地調査・<br>要件定義</div>
+      <div class="step-body">電波環境測定<br>設置場所確認<br>既存回線との整合確認</div>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step-box">
+      <div class="step-num">STEP 02</div>
+      <div class="step-title">設計・<br>機器選定</div>
+      <div class="step-body">ルーター選定<br>回線構成設計<br>UPS容量計算</div>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step-box">
+      <div class="step-num">STEP 03</div>
+      <div class="step-title">機器調達・<br>工事準備</div>
+      <div class="step-body">au申込手続き<br>ルーター・配線<br>資材手配</div>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step-box">
+      <div class="step-num">STEP 04</div>
+      <div class="step-title">設置工事・<br>開通確認</div>
+      <div class="step-body">アンテナ設置<br>回線開通<br>フェイルオーバーテスト</div>
+    </div>
+    <div class="step-arrow">→</div>
+    <div class="step-box">
+      <div class="step-num">STEP 05</div>
+      <div class="step-title">運用開始・<br>保守契約</div>
+      <div class="step-body">警備員への<br>操作説明<br>24H保守開始</div>
+    </div>
+  </div>
+  <div class="card-grid card-grid-2" style="margin-bottom:24px;">
+    <div class="card">
+      <div class="card-title">📅 標準スケジュール</div>
+      <div class="card-body">
+        Week 1-2：現地調査・要件定義<br>
+        Week 3-4：設計・機器発注<br>
+        Week 5-6：工事準備・資材搬入<br>
+        Week 7-8：設置工事・開通・テスト<br>
+        Week 9〜 ：本番運用開始
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">✅ 導入前チェックポイント</div>
+      <div class="card-body">
+        □ 屋上または外壁の設置スペース確保<br>
+        □ 南〜西方向の空の視界（衛星仰角）<br>
+        □ 電源（AC100V）の引き込み<br>
+        □ データセンターの設備変更申請手続き<br>
+        □ 既存ルーターの置き換えまたは追加
+      </div>
+    </div>
+  </div>
+  <div class="highlight-box">
+    <div class="highlight-box-title">💡 スモールスタート可能</div>
+    <div class="highlight-box-body">
+      まず1棟・1フロアからのトライアル導入（3ヶ月）も対応可能です。実運用データを確認してから全館展開への移行をご検討いただけます。
+    </div>
+  </div>
+  <div class="page-num">8 / 12</div>
+</div>
+
+
+<!-- ===== スライド 9: 費用感 ===== -->
+<div class="slide slide-content" style="position:relative;">
+  <div class="content-title">概算費用 ― 標準モデル（データセンター1棟）</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;">
+    <div>
+      <div style="font-size:15px;font-weight:700;color:var(--primary);margin-bottom:12px;">【初期費用】</div>
+      <table class="price-table">
+        <thead>
+          <tr><th>項目</th><th>概算金額</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Starlink端末（Flat High Performance）</td><td>約 150,000円</td></tr>
+          <tr><td>冗長化ルーター（Peplink Balance等）</td><td>約 80,000〜150,000円</td></tr>
+          <tr><td>UPS（無停電電源装置）</td><td>約 50,000〜100,000円</td></tr>
+          <tr><td>設置工事費（アンテナ・配線）</td><td>約 100,000〜200,000円</td></tr>
+          <tr><td>設定・開通テスト費</td><td>約 50,000円</td></tr>
+          <tr class="total-row"><td><strong>初期費用合計（目安）</strong></td><td><strong>約 43〜65万円</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:700;color:var(--primary);margin-bottom:12px;">【月額費用】</div>
+      <table class="price-table">
+        <thead>
+          <tr><th>項目</th><th>概算金額/月</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>au Starlink 法人回線料</td><td>約 15,000〜25,000円</td></tr>
+          <tr><td>保守・監視サービス料</td><td>約 10,000〜20,000円</td></tr>
+          <tr><td>（既存回線は継続）</td><td>変更なし</td></tr>
+          <tr class="total-row"><td><strong>月額追加費用（目安）</strong></td><td><strong>約 2.5〜4.5万円</strong></td></tr>
+        </tbody>
+      </table>
+      <div class="highlight-box" style="margin-top:20px;padding:20px;">
+        <div class="highlight-box-title" style="font-size:16px;">💰 費用対効果の考え方</div>
+        <div class="highlight-box-body" style="font-size:14px;">
+          通信断による損害賠償リスク・SLA違約金・顧客離脱リスクと比較すると、<br>
+          <span class="em-blue">月額3〜5万円の追加投資</span>でリスクを大幅に低減できます。
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:20px;font-size:13px;color:#6a8aaa;">
+    ※上記は概算です。現地調査・設計後に正式な見積をご提示します。au法人向け特別価格適用の場合あり。
+  </div>
+  <div class="page-num">9 / 12</div>
+</div>
+
+
+<!-- ===== スライド 10: 導入効果 ===== -->
+<div class="slide slide-content" style="position:relative;">
+  <div class="content-title">導入による期待効果</div>
+  <div class="metrics-row" style="margin-bottom:28px;">
+    <div class="metric-box">
+      <div class="metric-value">99.99<span style="font-size:16px;">%</span></div>
+      <div class="metric-label">警備通信システム<br>稼働率（目標）</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-value">&lt;30<span style="font-size:20px;">秒</span></div>
+      <div class="metric-label">フェイルオーバー<br>切替時間</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-value">72<span style="font-size:20px;">時間</span></div>
+      <div class="metric-label">UPS組み合わせ時の<br>継続稼働目安</div>
+    </div>
+    <div class="metric-box">
+      <div class="metric-value">0<span style="font-size:20px;">件</span></div>
+      <div class="metric-label">通信断による<br>監視空白（目標）</div>
+    </div>
+  </div>
+  <div class="card-grid card-grid-2">
+    <div>
+      <div style="font-size:16px;font-weight:700;color:#ffffff;margin-bottom:16px;">定性的な効果</div>
+      <ul class="checklist">
+        <li>災害時の<strong>顧客への継続稼働報告</strong>が可能になり、信頼性が向上</li>
+        <li>警備員・警備センター間の通信断がなくなり、<strong>指揮系統が維持</strong>される</li>
+        <li>BCP（事業継続計画）対応の訴求ポイントとして<strong>新規顧客への差別化</strong>に活用可能</li>
+        <li>SLA保証の強化による<strong>契約単価の見直し</strong>（アップセル）機会の創出</li>
+        <li>通信障害起因の<strong>損害賠償リスクの低減</strong></li>
+        <li>au KDDIとの<strong>法人パートナーシップ</strong>による安定したサポート</li>
+      </ul>
+    </div>
+    <div>
+      <div style="font-size:16px;font-weight:700;color:#ffffff;margin-bottom:16px;">顧客企業のメリット</div>
+      <ul class="checklist">
+        <li>データセンター運営の<strong>BCP要件を満たす</strong>通信冗長化を証明できる</li>
+        <li>金融・医療・行政等の<strong>厳格なコンプライアンス要件</strong>への対応強化</li>
+        <li>入居テナントへの<strong>「災害時も監視継続」</strong>をアピール可能</li>
+        <li>警備会社との<strong>長期契約の根拠</strong>となる付加価値の提供</li>
+        <li>ISO27001・SOC2等の<strong>セキュリティ認証審査</strong>でのアドバンテージ</li>
+      </ul>
+    </div>
+  </div>
+  <div class="page-num">10 / 12</div>
+</div>
+
+
+<!-- ===== スライド 11: よくある質問 ===== -->
+<div class="slide slide-content" style="position:relative;">
+  <div class="content-title">よくあるご質問（FAQ）</div>
+  <div class="card-grid" style="grid-template-columns:1fr;gap:16px;">
+    <div class="card" style="padding:20px 28px;">
+      <div style="display:flex;gap:16px;align-items:flex-start;">
+        <div style="background:rgba(0,168,255,0.2);border:1px solid var(--primary);border-radius:6px;padding:4px 12px;font-size:13px;color:var(--primary);font-weight:700;flex-shrink:0;">Q</div>
+        <div style="flex:1;">
+          <div style="font-size:16px;font-weight:700;color:#ffffff;margin-bottom:8px;">大雨や台風でStarlinkのアンテナは使えますか？</div>
+          <div style="font-size:14px;color:#8aa4c8;line-height:1.8;">
+            <span style="color:var(--green);font-weight:700;">A：</span>
+            Starlink Flat High Performanceは<strong>防水・耐候設計（IP56）</strong>で、強風（最大278km/h相当）にも耐える設計です。ただし豪雨時は一時的な速度低下の可能性があります。補助としてLTE回線との3重化も対応可能です。
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="padding:20px 28px;">
+      <div style="display:flex;gap:16px;align-items:flex-start;">
+        <div style="background:rgba(0,168,255,0.2);border:1px solid var(--primary);border-radius:6px;padding:4px 12px;font-size:13px;color:var(--primary);font-weight:700;flex-shrink:0;">Q</div>
+        <div style="flex:1;">
+          <div style="font-size:16px;font-weight:700;color:#ffffff;margin-bottom:8px;">既存の警備システムはそのまま使えますか？</div>
+          <div style="font-size:14px;color:#8aa4c8;line-height:1.8;">
+            <span style="color:var(--green);font-weight:700;">A：</span>
+            はい。冗長化ルーターをネットワークの出口に追加するだけで、既存の警備カメラ・センサー・入退室管理システムはそのまま継続利用できます。既存システムへの変更は原則不要です。
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="padding:20px 28px;">
+      <div style="display:flex;gap:16px;align-items:flex-start;">
+        <div style="background:rgba(0,168,255,0.2);border:1px solid var(--primary);border-radius:6px;padding:4px 12px;font-size:13px;color:var(--primary);font-weight:700;flex-shrink:0;">Q</div>
+        <div style="flex:1;">
+          <div style="font-size:16px;font-weight:700;color:#ffffff;margin-bottom:8px;">セキュリティ（情報漏洩リスク）は問題ありませんか？</div>
+          <div style="font-size:14px;color:#8aa4c8;line-height:1.8;">
+            <span style="color:var(--green);font-weight:700;">A：</span>
+            Starlinkの通信はAES-256による暗号化が施されています。au法人向けサービスでは追加のVPN構成も対応可能です。警備センターとの通信はIPsec VPNまたは専用APNで保護した形での導入をご提案します。
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="padding:20px 28px;">
+      <div style="display:flex;gap:16px;align-items:flex-start;">
+        <div style="background:rgba(0,168,255,0.2);border:1px solid var(--primary);border-radius:6px;padding:4px 12px;font-size:13px;color:var(--primary);font-weight:700;flex-shrink:0;">Q</div>
+        <div style="flex:1;">
+          <div style="font-size:16px;font-weight:700;color:#ffffff;margin-bottom:8px;">建物の許可が必要ですか？工事の規模はどの程度ですか？</div>
+          <div style="font-size:14px;color:#8aa4c8;line-height:1.8;">
+            <span style="color:var(--green);font-weight:700;">A：</span>
+            屋上への設置には建物管理者の承認が必要です。アンテナ自体は約60cmで、ドリルビスまたは架台での設置となります。電源配線を含め、一般的な工事期間は1〜2日程度です。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="page-num">11 / 12</div>
+</div>
+
+
+<!-- ===== スライド 12: 次のステップ / CTA ===== -->
+<div class="slide slide-cta" style="position:relative;">
+  <div style="max-width:900px;margin:0 auto;text-align:center;">
+    <div class="title-badge">NEXT STEP</div>
+    <div class="cta-title">まずは無料の現地調査から<br>始めましょう</div>
+    <div class="cta-sub">
+      電波環境の測定・設置スペースの確認・概算見積まで<br>
+      <span class="em-blue">無料にてご対応いたします。</span><br>
+      お気軽にお声がけください。
+    </div>
+    <div class="cta-button">無料現地調査を申し込む</div>
+  </div>
+  <div class="contact-grid">
+    <div class="contact-item">
+      <div class="contact-label">PROPOSAL BY</div>
+      <div class="contact-value">警備営業部</div>
+      <div style="font-size:13px;color:#6a8aaa;margin-top:6px;">データセンター警備推進チーム</div>
+    </div>
+    <div class="contact-item">
+      <div class="contact-label">SERVICE PARTNER</div>
+      <div class="contact-value">KDDI株式会社（au）</div>
+      <div style="font-size:13px;color:#6a8aaa;margin-top:6px;">法人向けStarlinkサービス提供</div>
+    </div>
+    <div class="contact-item">
+      <div class="contact-label">DATE</div>
+      <div class="contact-value">2026年6月24日</div>
+      <div style="font-size:13px;color:#6a8aaa;margin-top:6px;">本資料の有効期限：3ヶ月</div>
+    </div>
+  </div>
+  <div class="page-num">12 / 12</div>
+</div>
+
+</body>
+</html>
