@@ -11,18 +11,18 @@ import pptx.oxml.ns as nsmap
 from lxml import etree
 import copy
 
-# ========== カラー定義 ==========
-C_BG_DARK   = RGBColor(0x0A, 0x0E, 0x1A)   # 背景（濃紺）
-C_BG_MID    = RGBColor(0x0D, 0x18, 0x28)   # カード背景
-C_PRIMARY   = RGBColor(0x00, 0xA8, 0xFF)   # メインブルー
-C_ACCENT    = RGBColor(0xFF, 0x6B, 0x35)   # オレンジ
-C_GREEN     = RGBColor(0x00, 0xD4, 0xAA)   # グリーン
+# ========== カラー定義（コーポレート：赤×白） ==========
+C_BG_DARK   = RGBColor(0xFF, 0xFF, 0xFF)   # 背景（白）
+C_BG_MID    = RGBColor(0xFF, 0xF5, 0xF5)   # カード背景（薄赤白）
+C_PRIMARY   = RGBColor(0xCC, 0x00, 0x00)   # メイン赤
+C_ACCENT    = RGBColor(0x99, 0x00, 0x00)   # 濃赤（アクセント）
+C_GREEN     = RGBColor(0xCC, 0x00, 0x00)   # ※緑→赤に統一
 C_WHITE     = RGBColor(0xFF, 0xFF, 0xFF)
-C_LIGHT     = RGBColor(0xC0, 0xD4, 0xE8)   # 本文テキスト
-C_MUTED     = RGBColor(0x6A, 0x8A, 0xAA)   # サブテキスト
-C_BORDER    = RGBColor(0x1E, 0x3A, 0x5F)
-C_RED_SOFT  = RGBColor(0xFF, 0x60, 0x60)
-C_CARD_BG   = RGBColor(0x11, 0x18, 0x27)
+C_LIGHT     = RGBColor(0x33, 0x33, 0x33)   # 本文テキスト（ほぼ黒）
+C_MUTED     = RGBColor(0x88, 0x88, 0x88)   # サブテキスト（グレー）
+C_BORDER    = RGBColor(0xE0, 0xC0, 0xC0)   # 枠線（薄赤）
+C_RED_SOFT  = RGBColor(0xCC, 0x00, 0x00)   # 問題点（赤）
+C_CARD_BG   = RGBColor(0xFF, 0xFA, 0xFA)   # カード背景（ほぼ白）
 
 W = Inches(13.33)
 H = Inches(7.5)
@@ -51,7 +51,7 @@ def add_rect(slide, l, t, w, h, fill=None, line_color=None, line_w=Pt(1)):
     return shape
 
 def add_text(slide, text, l, t, w, h,
-             size=Pt(14), bold=False, color=C_WHITE,
+             size=Pt(14), bold=False, color=C_LIGHT,
              align=PP_ALIGN.LEFT, wrap=True, italic=False):
     txb = slide.shapes.add_textbox(l, t, w, h)
     txb.word_wrap = wrap
@@ -97,10 +97,12 @@ def add_textbox_multiline(slide, lines, l, t, w, h,
 
 def fill_slide_bg(slide, color=C_BG_DARK):
     add_rect(slide, 0, 0, W, H, fill=color)
+    # 全スライド共通: 上部に赤帯
+    add_rect(slide, 0, 0, W, Inches(1.1), fill=C_PRIMARY)
 
 def section_bar(slide, l=Inches(0.6), t=Inches(1.35), h=Inches(0.38)):
-    """タイトル左のアクセントバー"""
-    add_rect(slide, l, t, Inches(0.08), h, fill=C_PRIMARY)
+    """タイトル左のアクセントバー（赤背景上では不要なので非表示相当）"""
+    pass  # ヘッダー帯で代替
 
 def page_num(slide, cur, total):
     add_text(slide, f"{cur} / {total}",
@@ -108,21 +110,24 @@ def page_num(slide, cur, total):
              size=Pt(11), color=C_MUTED, align=PP_ALIGN.RIGHT)
 
 def slide_title_bar(slide, title):
-    section_bar(slide)
+    # 赤ヘッダー帯の上にタイトルを白で表示
     add_text(slide, title,
-             Inches(0.8), Inches(1.25), Inches(11.8), Inches(0.5),
+             Inches(0.6), Inches(0.2), Inches(12.1), Inches(0.7),
              size=Pt(22), bold=True, color=C_WHITE)
-    add_rect(slide, Inches(0.6), Inches(1.8), Inches(12.1), Pt(1.5),
+    # 帯下の区切り線
+    add_rect(slide, Inches(0.5), Inches(1.15), Inches(12.3), Pt(1.5),
              fill=C_BORDER)
 
 def card_box(slide, l, t, w, h, title, body,
              title_color=C_PRIMARY, body_size=Pt(12.5),
              icon=""):
     add_rect(slide, l, t, w, h, fill=C_CARD_BG, line_color=C_BORDER, line_w=Pt(1.2))
+    # カード上部に細い赤ライン
+    add_rect(slide, l, t, w, Inches(0.045), fill=C_PRIMARY)
     ty = t + Inches(0.18)
     if icon:
         add_text(slide, icon, l + Inches(0.18), ty, Inches(0.5), Inches(0.4),
-                 size=Pt(20), color=C_WHITE)
+                 size=Pt(20), color=C_LIGHT)
         tx = l + Inches(0.72)
         tw = w - Inches(0.9)
     else:
@@ -135,14 +140,16 @@ def card_box(slide, l, t, w, h, title, body,
 
 def highlight_box(slide, l, t, w, h, title, body):
     add_rect(slide, l, t, w, h,
-             fill=RGBColor(0x0A, 0x1E, 0x32), line_color=C_PRIMARY, line_w=Pt(1.5))
-    add_text(slide, title, l + Inches(0.2), t + Inches(0.15), w - Inches(0.4), Inches(0.35),
+             fill=RGBColor(0xFF, 0xF0, 0xF0), line_color=C_PRIMARY, line_w=Pt(1.5))
+    add_rect(slide, l, t, Inches(0.06), h, fill=C_PRIMARY)
+    add_text(slide, title, l + Inches(0.18), t + Inches(0.1), w - Inches(0.28), Inches(0.35),
              size=Pt(14), bold=True, color=C_PRIMARY)
-    add_text(slide, body, l + Inches(0.2), t + Inches(0.5), w - Inches(0.4), h - Inches(0.6),
+    add_text(slide, body, l + Inches(0.18), t + Inches(0.46), w - Inches(0.28), h - Inches(0.55),
              size=Pt(12.5), color=C_LIGHT, wrap=True)
 
 def metric_box(slide, l, t, w, h, value, label):
     add_rect(slide, l, t, w, h, fill=C_CARD_BG, line_color=C_BORDER, line_w=Pt(1.2))
+    add_rect(slide, l, t, w, Inches(0.045), fill=C_PRIMARY)
     add_text(slide, value, l, t + Inches(0.15), w, Inches(0.6),
              size=Pt(32), bold=True, color=C_PRIMARY, align=PP_ALIGN.CENTER)
     add_text(slide, label, l, t + Inches(0.75), w, Inches(0.55),
@@ -152,46 +159,43 @@ def metric_box(slide, l, t, w, h, value, label):
 # スライド 1: タイトル
 # ========================================================
 sl = prs.slides.add_slide(blank_layout)
-fill_slide_bg(sl)
-
-# 装飾グラデーション帯
-add_rect(sl, 0, 0, W, Inches(0.06), fill=C_PRIMARY)
-add_rect(sl, 0, H - Inches(0.06), W, Inches(0.06), fill=C_PRIMARY)
+# タイトルスライドは上半分赤・下半分白
+add_rect(sl, 0, 0, W, H, fill=C_WHITE)
+add_rect(sl, 0, 0, W, Inches(4.2), fill=C_PRIMARY)
+add_rect(sl, 0, H - Inches(0.08), W, Inches(0.08), fill=C_PRIMARY)
 
 # バッジ
-badge = add_rect(sl, Inches(0.8), Inches(1.2), Inches(1.8), Inches(0.35),
-                 fill=RGBColor(0x00, 0x28, 0x44), line_color=C_PRIMARY, line_w=Pt(1))
-add_text(sl, "PROPOSAL 2026", Inches(0.82), Inches(1.22), Inches(1.76), Inches(0.3),
-         size=Pt(11), bold=True, color=C_PRIMARY, align=PP_ALIGN.CENTER)
+add_rect(sl, Inches(0.8), Inches(0.55), Inches(1.9), Inches(0.32),
+         fill=RGBColor(0xAA, 0x00, 0x00), line_color=None)
+add_text(sl, "PROPOSAL 2026", Inches(0.82), Inches(0.57), Inches(1.86), Inches(0.28),
+         size=Pt(11), bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
 
-# メインタイトル
+# メインタイトル（赤帯上→白テキスト）
 add_text(sl, "災害に強いデータセンター警備",
-         Inches(0.8), Inches(1.75), Inches(11.5), Inches(0.85),
+         Inches(0.8), Inches(1.05), Inches(11.5), Inches(0.9),
          size=Pt(40), bold=True, color=C_WHITE)
 add_text(sl, "au Starlink 通信冗長化ソリューション",
-         Inches(0.8), Inches(2.55), Inches(11.5), Inches(0.7),
-         size=Pt(32), bold=True, color=C_PRIMARY)
+         Inches(0.8), Inches(1.95), Inches(11.5), Inches(0.7),
+         size=Pt(28), bold=True, color=RGBColor(0xFF, 0xCC, 0xCC))
 
-# サブタイトル
+# サブタイトル（赤帯上→白）
 add_text(sl,
          "衛星通信 × 地上回線のハイブリッド構成で\n「どんな災害でも途切れない警備体制」を実現します",
-         Inches(0.8), Inches(3.35), Inches(10.5), Inches(1.1),
-         size=Pt(17), color=C_LIGHT, wrap=True)
+         Inches(0.8), Inches(2.75), Inches(10.5), Inches(1.1),
+         size=Pt(16), color=RGBColor(0xFF, 0xEE, 0xEE), wrap=True)
 
-# 区切り線
-add_rect(sl, Inches(0.8), Inches(4.6), Inches(11.5), Pt(1), fill=C_BORDER)
-
-# メタ情報
+# 白エリアのメタ情報
+add_rect(sl, Inches(0.8), Inches(4.35), Inches(11.5), Pt(1.5), fill=C_BORDER)
 for i, (lbl, val) in enumerate([
     ("提案日", "2026年6月25日"),
     ("提案先", "貴社データセンター担当者様"),
     ("作成者", "警備営業部"),
 ]):
     x = Inches(0.8) + i * Inches(3.9)
-    add_text(sl, lbl, x, Inches(4.75), Inches(1.2), Inches(0.3),
+    add_text(sl, lbl, x, Inches(4.5), Inches(1.2), Inches(0.3),
              size=Pt(11), color=C_MUTED)
-    add_text(sl, val, x, Inches(5.05), Inches(3.7), Inches(0.4),
-             size=Pt(14), bold=True, color=C_WHITE)
+    add_text(sl, val, x, Inches(4.8), Inches(3.7), Inches(0.4),
+             size=Pt(14), bold=True, color=C_LIGHT)
 
 page_num(sl, 1, 13)
 
@@ -299,7 +303,7 @@ ny = Inches(2.5)
 for (txt, col, nw, nh) in nodes:
     nx = Inches(6.6) + (Inches(6.2) - nw) / 2
     add_rect(sl, nx, ny, nw, nh,
-             fill=RGBColor(0x0A, 0x1A, 0x2E), line_color=col, line_w=Pt(1.2))
+             fill=RGBColor(0xFF, 0xF8, 0xF8), line_color=col, line_w=Pt(1.2))
     add_text(sl, txt, nx, ny, nw, nh,
              size=Pt(12), color=col, align=PP_ALIGN.CENTER, bold=True)
     ny += nh + Inches(0.12)
@@ -342,7 +346,7 @@ start_y = Inches(2.0)
 # ヘッダー行
 x = Inches(0.4)
 for j, (hdr, cw) in enumerate(zip(headers, col_w)):
-    bg = C_PRIMARY if j == 4 else RGBColor(0x05, 0x18, 0x30)
+    bg = C_PRIMARY if j == 4 else RGBColor(0xCC, 0x00, 0x00)
     add_rect(sl, x, start_y, cw, row_h, fill=bg)
     add_text(sl, hdr, x + Inches(0.05), start_y + Inches(0.06),
              cw - Inches(0.1), row_h - Inches(0.1),
@@ -357,11 +361,11 @@ mark_colors = {
 }
 for ri, row in enumerate(rows_data):
     y = start_y + (ri + 1) * row_h
-    row_bg = RGBColor(0x0D, 0x1A, 0x28) if ri % 2 else C_CARD_BG
+    row_bg = RGBColor(0xFF, 0xF5, 0xF5) if ri % 2 else C_CARD_BG
     x = Inches(0.4)
     for j, (cell, cw) in enumerate(zip(row, col_w)):
         highlight_col = j == 4
-        bg = RGBColor(0x08, 0x22, 0x38) if highlight_col else row_bg
+        bg = RGBColor(0xFF, 0xEE, 0xEE) if highlight_col else row_bg
         add_rect(sl, x, y, cw, row_h, fill=bg)
         fc = C_WHITE if j == 0 else C_LIGHT
         for mark, mc in mark_colors.items():
@@ -449,7 +453,7 @@ normal_nodes = [
 ny = Inches(2.4)
 for txt, col in normal_nodes:
     add_rect(sl, Inches(0.6), ny, Inches(5.2), Inches(0.5),
-             fill=RGBColor(0x08, 0x18, 0x28), line_color=col, line_w=Pt(1.2))
+             fill=RGBColor(0xFF, 0xF8, 0xF8), line_color=col, line_w=Pt(1.2))
     add_text(sl, txt, Inches(0.65), ny + Inches(0.08),
              Inches(5.1), Inches(0.35), size=Pt(12), bold=True, color=col,
              align=PP_ALIGN.CENTER)
@@ -472,7 +476,7 @@ failover_nodes = [
 ny = Inches(2.4)
 for txt, col in failover_nodes:
     add_rect(sl, Inches(7.3), ny, Inches(5.2), Inches(0.5),
-             fill=RGBColor(0x08, 0x18, 0x28), line_color=col, line_w=Pt(1.2))
+             fill=RGBColor(0xFF, 0xF8, 0xF8), line_color=col, line_w=Pt(1.2))
     add_text(sl, txt, Inches(7.35), ny + Inches(0.08),
              Inches(5.1), Inches(0.35), size=Pt(12), bold=True, color=col,
              align=PP_ALIGN.CENTER)
@@ -515,7 +519,7 @@ hot_nodes = [
 ny = Inches(2.55)
 for txt, col in hot_nodes:
     add_rect(sl, Inches(0.9), ny, Inches(4.9), Inches(0.45),
-             fill=RGBColor(0x08, 0x18, 0x28), line_color=col, line_w=Pt(1.2))
+             fill=RGBColor(0xFF, 0xF8, 0xF8), line_color=col, line_w=Pt(1.2))
     add_text(sl, txt, Inches(0.95), ny + Inches(0.06),
              Inches(4.8), Inches(0.33), size=Pt(12), bold=True, color=col,
              align=PP_ALIGN.CENTER)
@@ -628,7 +632,7 @@ init_items = [
 ty = Inches(2.35)
 for i, (item, price) in enumerate(init_items):
     is_total = i == len(init_items) - 1
-    bg = RGBColor(0x08, 0x20, 0x38) if is_total else (C_CARD_BG if i % 2 == 0 else RGBColor(0x0D, 0x1A, 0x28))
+    bg = RGBColor(0xFF, 0xEE, 0xEE) if is_total else (C_CARD_BG if i % 2 == 0 else RGBColor(0xFF, 0xF5, 0xF5))
     add_rect(sl, Inches(0.5), ty, Inches(4.0), Inches(0.4), fill=bg)
     add_rect(sl, Inches(4.5), ty, Inches(1.9), Inches(0.4), fill=bg)
     tc = C_PRIMARY if is_total else C_LIGHT
@@ -651,7 +655,7 @@ monthly_items = [
 ty = Inches(2.35)
 for i, (item, price) in enumerate(monthly_items):
     is_total = i == len(monthly_items) - 1
-    bg = RGBColor(0x08, 0x20, 0x38) if is_total else (C_CARD_BG if i % 2 == 0 else RGBColor(0x0D, 0x1A, 0x28))
+    bg = RGBColor(0xFF, 0xEE, 0xEE) if is_total else (C_CARD_BG if i % 2 == 0 else RGBColor(0xFF, 0xF5, 0xF5))
     add_rect(sl, Inches(7.1), ty, Inches(3.8), Inches(0.4), fill=bg)
     add_rect(sl, Inches(10.9), ty, Inches(1.9), Inches(0.4), fill=bg)
     tc = C_PRIMARY if is_total else C_LIGHT
@@ -769,33 +773,32 @@ page_num(sl, 12, 13)
 # スライド 13: CTA
 # ========================================================
 sl = prs.slides.add_slide(blank_layout)
-fill_slide_bg(sl)
+# CTA: 赤背景全面
+add_rect(sl, 0, 0, W, H, fill=C_PRIMARY)
+add_rect(sl, 0, 0, W, Inches(1.1), fill=RGBColor(0xAA, 0x00, 0x00))
 
-add_rect(sl, 0, 0, W, Inches(0.06), fill=C_PRIMARY)
-add_rect(sl, 0, H - Inches(0.06), W, Inches(0.06), fill=C_PRIMARY)
-
-badge2 = add_rect(sl, Inches(5.6), Inches(0.9), Inches(2.1), Inches(0.35),
-                  fill=RGBColor(0x00, 0x28, 0x44), line_color=C_PRIMARY, line_w=Pt(1))
-add_text(sl, "NEXT STEP", Inches(5.62), Inches(0.92), Inches(2.06), Inches(0.3),
-         size=Pt(11), bold=True, color=C_PRIMARY, align=PP_ALIGN.CENTER)
+add_text(sl, "NEXT STEP",
+         Inches(5.8), Inches(0.22), Inches(1.7), Inches(0.3),
+         size=Pt(11), bold=True, color=RGBColor(0xFF, 0xCC, 0xCC), align=PP_ALIGN.CENTER)
 
 add_text(sl, "まずは無料の現地調査から始めましょう",
-         Inches(1.0), Inches(1.45), Inches(11.3), Inches(0.8),
+         Inches(1.0), Inches(1.3), Inches(11.3), Inches(0.8),
          size=Pt(34), bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
 
 add_text(sl,
          "電波環境の測定・設置スペースの確認・概算見積まで\n無料にてご対応いたします。お気軽にお声がけください。",
-         Inches(1.5), Inches(2.4), Inches(10.3), Inches(0.9),
-         size=Pt(16), color=C_LIGHT, align=PP_ALIGN.CENTER, wrap=True)
+         Inches(1.5), Inches(2.25), Inches(10.3), Inches(0.9),
+         size=Pt(16), color=RGBColor(0xFF, 0xEE, 0xEE), align=PP_ALIGN.CENTER, wrap=True)
 
-# CTAボタン風
-add_rect(sl, Inches(4.4), Inches(3.45), Inches(4.5), Inches(0.65),
-         fill=C_PRIMARY, line_color=None)
+# CTAボタン風（白地に赤テキスト）
+add_rect(sl, Inches(4.4), Inches(3.25), Inches(4.5), Inches(0.65),
+         fill=C_WHITE, line_color=None)
 add_text(sl, "無料現地調査を申し込む",
-         Inches(4.4), Inches(3.53), Inches(4.5), Inches(0.5),
-         size=Pt(16), bold=True, color=C_BG_DARK, align=PP_ALIGN.CENTER)
+         Inches(4.4), Inches(3.33), Inches(4.5), Inches(0.5),
+         size=Pt(16), bold=True, color=C_PRIMARY, align=PP_ALIGN.CENTER)
 
-add_rect(sl, Inches(0.5), Inches(4.35), Inches(12.3), Pt(1), fill=C_BORDER)
+add_rect(sl, Inches(0.5), Inches(4.2), Inches(12.3), Pt(1),
+         fill=RGBColor(0xAA, 0x00, 0x00))
 
 for i, (lbl, val, sub) in enumerate([
     ("PROPOSAL BY",     "警備営業部",          "データセンター警備推進チーム"),
@@ -803,16 +806,18 @@ for i, (lbl, val, sub) in enumerate([
     ("DATE",            "2026年6月25日",        "本資料の有効期限：3ヶ月"),
 ]):
     x = Inches(0.7) + i * Inches(4.15)
-    add_rect(sl, x, Inches(4.55), Inches(3.9), Inches(1.5),
-             fill=C_CARD_BG, line_color=C_BORDER, line_w=Pt(1.2))
-    add_text(sl, lbl, x + Inches(0.15), Inches(4.65), Inches(3.6), Inches(0.28),
-             size=Pt(10), color=C_PRIMARY)
-    add_text(sl, val, x + Inches(0.15), Inches(4.93), Inches(3.6), Inches(0.35),
+    add_rect(sl, x, Inches(4.4), Inches(3.9), Inches(1.6),
+             fill=RGBColor(0xAA, 0x00, 0x00), line_color=None)
+    add_text(sl, lbl, x + Inches(0.15), Inches(4.5), Inches(3.6), Inches(0.28),
+             size=Pt(10), color=RGBColor(0xFF, 0xCC, 0xCC))
+    add_text(sl, val, x + Inches(0.15), Inches(4.78), Inches(3.6), Inches(0.35),
              size=Pt(15), bold=True, color=C_WHITE)
-    add_text(sl, sub, x + Inches(0.15), Inches(5.28), Inches(3.6), Inches(0.3),
-             size=Pt(11), color=C_MUTED)
+    add_text(sl, sub, x + Inches(0.15), Inches(5.13), Inches(3.6), Inches(0.3),
+             size=Pt(11), color=RGBColor(0xFF, 0xDD, 0xDD))
 
-page_num(sl, 13, 13)
+add_text(sl, "13 / 13",
+         W - Inches(1.5), H - Inches(0.45), Inches(1.3), Inches(0.3),
+         size=Pt(11), color=RGBColor(0xFF, 0xCC, 0xCC), align=PP_ALIGN.RIGHT)
 
 # ========== 保存 ==========
 out = "/home/user/test/datacenter_security_proposal.pptx"
