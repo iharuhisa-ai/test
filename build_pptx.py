@@ -11,18 +11,18 @@ import pptx.oxml.ns as nsmap
 from lxml import etree
 import copy
 
-# ========== カラー定義（コーポレート：赤×白） ==========
+# ========== カラー定義（トリコロール：ソフト赤×白×紺） ==========
 C_BG_DARK   = RGBColor(0xFF, 0xFF, 0xFF)   # 背景（白）
-C_BG_MID    = RGBColor(0xFF, 0xF5, 0xF5)   # カード背景（薄赤白）
-C_PRIMARY   = RGBColor(0xCC, 0x00, 0x00)   # メイン赤
-C_ACCENT    = RGBColor(0x99, 0x00, 0x00)   # 濃赤（アクセント）
-C_GREEN     = RGBColor(0xCC, 0x00, 0x00)   # ※緑→赤に統一
+C_BG_MID    = RGBColor(0xF4, 0xF6, 0xFA)   # カード背景（薄グレー白）
+C_PRIMARY   = RGBColor(0xD0, 0x22, 0x2D)   # ソフト赤
+C_ACCENT    = RGBColor(0x1A, 0x3A, 0x6B)   # 紺（アクセント）
+C_GREEN     = RGBColor(0x1A, 0x3A, 0x6B)   # 紺（強調）
 C_WHITE     = RGBColor(0xFF, 0xFF, 0xFF)
-C_LIGHT     = RGBColor(0x33, 0x33, 0x33)   # 本文テキスト（ほぼ黒）
-C_MUTED     = RGBColor(0x88, 0x88, 0x88)   # サブテキスト（グレー）
-C_BORDER    = RGBColor(0xE0, 0xC0, 0xC0)   # 枠線（薄赤）
-C_RED_SOFT  = RGBColor(0xCC, 0x00, 0x00)   # 問題点（赤）
-C_CARD_BG   = RGBColor(0xFF, 0xFA, 0xFA)   # カード背景（ほぼ白）
+C_LIGHT     = RGBColor(0x22, 0x2C, 0x3E)   # 本文テキスト（ほぼ黒）
+C_MUTED     = RGBColor(0x7A, 0x86, 0x99)   # サブテキスト（グレー）
+C_BORDER    = RGBColor(0xD8, 0xDE, 0xEA)   # 枠線（薄グレー）
+C_RED_SOFT  = RGBColor(0xD0, 0x22, 0x2D)   # 問題点赤
+C_CARD_BG   = RGBColor(0xF8, 0xF9, 0xFC)   # カード背景（ほぼ白）
 
 W = Inches(13.33)
 H = Inches(7.5)
@@ -97,8 +97,12 @@ def add_textbox_multiline(slide, lines, l, t, w, h,
 
 def fill_slide_bg(slide, color=C_BG_DARK):
     add_rect(slide, 0, 0, W, H, fill=color)
-    # 全スライド共通: 上部に赤帯
-    add_rect(slide, 0, 0, W, Inches(1.1), fill=C_PRIMARY)
+    # ヘッダー：紺帯（上部）
+    add_rect(slide, 0, 0, W, Inches(1.1), fill=C_ACCENT)
+    # ヘッダー下部：ソフト赤ライン
+    add_rect(slide, 0, Inches(1.1), W, Inches(0.06), fill=C_PRIMARY)
+    # フッター：ソフト赤ライン
+    add_rect(slide, 0, H - Inches(0.08), W, Inches(0.08), fill=C_PRIMARY)
 
 def section_bar(slide, l=Inches(0.6), t=Inches(1.35), h=Inches(0.38)):
     """タイトル左のアクセントバー（赤背景上では不要なので非表示相当）"""
@@ -159,42 +163,49 @@ def metric_box(slide, l, t, w, h, value, label):
 # スライド 1: タイトル
 # ========================================================
 sl = prs.slides.add_slide(blank_layout)
-# タイトルスライドは上半分赤・下半分白
+# タイトルスライド：紺上部帯＋白下部
 add_rect(sl, 0, 0, W, H, fill=C_WHITE)
-add_rect(sl, 0, 0, W, Inches(4.2), fill=C_PRIMARY)
+add_rect(sl, 0, 0, W, Inches(4.0), fill=C_ACCENT)          # 紺帯
+add_rect(sl, 0, Inches(4.0), W, Inches(0.1), fill=C_PRIMARY)  # 赤区切りライン
 add_rect(sl, 0, H - Inches(0.08), W, Inches(0.08), fill=C_PRIMARY)
 
-# バッジ
-add_rect(sl, Inches(0.8), Inches(0.55), Inches(1.9), Inches(0.32),
-         fill=RGBColor(0xAA, 0x00, 0x00), line_color=None)
-add_text(sl, "PROPOSAL 2026", Inches(0.82), Inches(0.57), Inches(1.86), Inches(0.28),
-         size=Pt(11), bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
+# 左縦ライン（赤）
+add_rect(sl, Inches(0.55), Inches(0.4), Inches(0.06), Inches(3.45), fill=C_PRIMARY)
 
-# メインタイトル（赤帯上→白テキスト）
+# バッジ（紺背景上）
+add_rect(sl, Inches(0.75), Inches(0.45), Inches(2.0), Inches(0.32),
+         fill=RGBColor(0x0E, 0x25, 0x4D), line_color=None)
+add_text(sl, "PROPOSAL 2026", Inches(0.77), Inches(0.47), Inches(1.96), Inches(0.28),
+         size=Pt(11), bold=True, color=RGBColor(0xB8, 0xC8, 0xE8), align=PP_ALIGN.CENTER)
+
+# メインタイトル（紺帯上→白テキスト）
 add_text(sl, "災害に強いデータセンター警備",
-         Inches(0.8), Inches(1.05), Inches(11.5), Inches(0.9),
-         size=Pt(40), bold=True, color=C_WHITE)
+         Inches(0.8), Inches(0.95), Inches(11.5), Inches(0.9),
+         size=Pt(38), bold=True, color=C_WHITE)
+# 赤ライン区切り
+add_rect(sl, Inches(0.75), Inches(1.88), Inches(4.5), Inches(0.05), fill=C_PRIMARY)
 add_text(sl, "au Starlink 通信冗長化ソリューション",
-         Inches(0.8), Inches(1.95), Inches(11.5), Inches(0.7),
-         size=Pt(28), bold=True, color=RGBColor(0xFF, 0xCC, 0xCC))
+         Inches(0.8), Inches(2.0), Inches(11.5), Inches(0.65),
+         size=Pt(26), bold=True, color=RGBColor(0xB8, 0xD0, 0xF0))
 
-# サブタイトル（赤帯上→白）
+# サブタイトル（紺帯上）
 add_text(sl,
          "衛星通信 × 地上回線のハイブリッド構成で\n「どんな災害でも途切れない警備体制」を実現します",
-         Inches(0.8), Inches(2.75), Inches(10.5), Inches(1.1),
-         size=Pt(16), color=RGBColor(0xFF, 0xEE, 0xEE), wrap=True)
+         Inches(0.8), Inches(2.75), Inches(10.5), Inches(1.05),
+         size=Pt(15), color=RGBColor(0xCC, 0xDB, 0xEE), wrap=True)
 
 # 白エリアのメタ情報
-add_rect(sl, Inches(0.8), Inches(4.35), Inches(11.5), Pt(1.5), fill=C_BORDER)
 for i, (lbl, val) in enumerate([
     ("提案日", "2026年6月25日"),
     ("提案先", "貴社データセンター担当者様"),
     ("作成者", "警備営業部"),
 ]):
-    x = Inches(0.8) + i * Inches(3.9)
-    add_text(sl, lbl, x, Inches(4.5), Inches(1.2), Inches(0.3),
+    x = Inches(0.8) + i * Inches(4.1)
+    # 紺の細ライン
+    add_rect(sl, x, Inches(4.28), Inches(0.04), Inches(0.85), fill=C_ACCENT)
+    add_text(sl, lbl, x + Inches(0.15), Inches(4.3), Inches(3.8), Inches(0.28),
              size=Pt(11), color=C_MUTED)
-    add_text(sl, val, x, Inches(4.8), Inches(3.7), Inches(0.4),
+    add_text(sl, val, x + Inches(0.15), Inches(4.58), Inches(3.8), Inches(0.38),
              size=Pt(14), bold=True, color=C_LIGHT)
 
 page_num(sl, 1, 13)
@@ -773,32 +784,35 @@ page_num(sl, 12, 13)
 # スライド 13: CTA
 # ========================================================
 sl = prs.slides.add_slide(blank_layout)
-# CTA: 赤背景全面
-add_rect(sl, 0, 0, W, H, fill=C_PRIMARY)
-add_rect(sl, 0, 0, W, Inches(1.1), fill=RGBColor(0xAA, 0x00, 0x00))
+# CTA: 白背景＋紺上部帯＋赤アクセント（タイトルスライドと統一感）
+add_rect(sl, 0, 0, W, H, fill=C_WHITE)
+add_rect(sl, 0, 0, W, Inches(1.1), fill=C_ACCENT)
+add_rect(sl, 0, Inches(1.1), W, Inches(0.06), fill=C_PRIMARY)
+add_rect(sl, 0, H - Inches(0.08), W, Inches(0.08), fill=C_PRIMARY)
 
 add_text(sl, "NEXT STEP",
-         Inches(5.8), Inches(0.22), Inches(1.7), Inches(0.3),
-         size=Pt(11), bold=True, color=RGBColor(0xFF, 0xCC, 0xCC), align=PP_ALIGN.CENTER)
+         Inches(0.6), Inches(0.22), Inches(2.0), Inches(0.65),
+         size=Pt(11), bold=True, color=RGBColor(0xB8, 0xC8, 0xE8))
 
 add_text(sl, "まずは無料の現地調査から始めましょう",
-         Inches(1.0), Inches(1.3), Inches(11.3), Inches(0.8),
-         size=Pt(34), bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
+         Inches(1.0), Inches(1.35), Inches(11.3), Inches(0.8),
+         size=Pt(32), bold=True, color=C_ACCENT, align=PP_ALIGN.CENTER)
+# 赤区切り線
+add_rect(sl, Inches(4.5), Inches(2.18), Inches(4.3), Inches(0.05), fill=C_PRIMARY)
 
 add_text(sl,
          "電波環境の測定・設置スペースの確認・概算見積まで\n無料にてご対応いたします。お気軽にお声がけください。",
-         Inches(1.5), Inches(2.25), Inches(10.3), Inches(0.9),
-         size=Pt(16), color=RGBColor(0xFF, 0xEE, 0xEE), align=PP_ALIGN.CENTER, wrap=True)
+         Inches(1.5), Inches(2.3), Inches(10.3), Inches(0.9),
+         size=Pt(15), color=C_MUTED, align=PP_ALIGN.CENTER, wrap=True)
 
-# CTAボタン風（白地に赤テキスト）
-add_rect(sl, Inches(4.4), Inches(3.25), Inches(4.5), Inches(0.65),
-         fill=C_WHITE, line_color=None)
+# CTAボタン風（赤地に白テキスト）
+add_rect(sl, Inches(4.2), Inches(3.25), Inches(4.9), Inches(0.65),
+         fill=C_PRIMARY, line_color=None)
 add_text(sl, "無料現地調査を申し込む",
-         Inches(4.4), Inches(3.33), Inches(4.5), Inches(0.5),
-         size=Pt(16), bold=True, color=C_PRIMARY, align=PP_ALIGN.CENTER)
+         Inches(4.2), Inches(3.33), Inches(4.9), Inches(0.5),
+         size=Pt(16), bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
 
-add_rect(sl, Inches(0.5), Inches(4.2), Inches(12.3), Pt(1),
-         fill=RGBColor(0xAA, 0x00, 0x00))
+add_rect(sl, Inches(0.5), Inches(4.2), Inches(12.3), Pt(1.5), fill=C_BORDER)
 
 for i, (lbl, val, sub) in enumerate([
     ("PROPOSAL BY",     "警備営業部",          "データセンター警備推進チーム"),
@@ -806,18 +820,17 @@ for i, (lbl, val, sub) in enumerate([
     ("DATE",            "2026年6月25日",        "本資料の有効期限：3ヶ月"),
 ]):
     x = Inches(0.7) + i * Inches(4.15)
-    add_rect(sl, x, Inches(4.4), Inches(3.9), Inches(1.6),
-             fill=RGBColor(0xAA, 0x00, 0x00), line_color=None)
-    add_text(sl, lbl, x + Inches(0.15), Inches(4.5), Inches(3.6), Inches(0.28),
-             size=Pt(10), color=RGBColor(0xFF, 0xCC, 0xCC))
-    add_text(sl, val, x + Inches(0.15), Inches(4.78), Inches(3.6), Inches(0.35),
-             size=Pt(15), bold=True, color=C_WHITE)
-    add_text(sl, sub, x + Inches(0.15), Inches(5.13), Inches(3.6), Inches(0.3),
-             size=Pt(11), color=RGBColor(0xFF, 0xDD, 0xDD))
+    add_rect(sl, x, Inches(4.4), Inches(3.9), Inches(1.7),
+             fill=C_CARD_BG, line_color=C_BORDER, line_w=Pt(1.2))
+    add_rect(sl, x, Inches(4.4), Inches(3.9), Inches(0.05), fill=C_ACCENT)
+    add_text(sl, lbl, x + Inches(0.18), Inches(4.52), Inches(3.6), Inches(0.28),
+             size=Pt(10), color=C_PRIMARY, bold=True)
+    add_text(sl, val, x + Inches(0.18), Inches(4.8), Inches(3.6), Inches(0.38),
+             size=Pt(15), bold=True, color=C_ACCENT)
+    add_text(sl, sub, x + Inches(0.18), Inches(5.18), Inches(3.6), Inches(0.3),
+             size=Pt(11), color=C_MUTED)
 
-add_text(sl, "13 / 13",
-         W - Inches(1.5), H - Inches(0.45), Inches(1.3), Inches(0.3),
-         size=Pt(11), color=RGBColor(0xFF, 0xCC, 0xCC), align=PP_ALIGN.RIGHT)
+page_num(sl, 13, 13)
 
 # ========== 保存 ==========
 out = "/home/user/test/datacenter_security_proposal.pptx"
