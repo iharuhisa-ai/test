@@ -510,6 +510,65 @@ Web：https://www.bespokejapantravel.com`;
   Logger.log('テストメールをスプレッドシートに書き込みました。');
 }
 
+/**
+ * Gemini API の動作確認用デバッグ関数
+ * 実行後、ログにエラー内容または解析結果が表示されます
+ */
+function debugTestGemini() {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+
+  if (!apiKey) {
+    Logger.log('❌ GEMINI_API_KEY がスクリプトプロパティに設定されていません');
+    return;
+  }
+  Logger.log('✅ APIキー確認: ' + apiKey.slice(0, 8) + '...');
+
+  const subject = 'テスト問い合わせ';
+  const body = '株式会社テスト 山田太郎です。製品について問い合わせしたいです。電話: 03-1234-5678';
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  const prompt = `以下のメールを解析してJSONで返してください。
+件名: ${subject}
+本文: ${body}
+形式: {"companyName":"","personName":"","phone":"","inquiryType":"","summary":"","urgency":"通常"}`;
+
+  const payload = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 512 },
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+
+    const statusCode = response.getResponseCode();
+    const text = response.getContentText();
+    Logger.log('HTTPステータス: ' + statusCode);
+    Logger.log('レスポンス: ' + text.slice(0, 500));
+
+    if (statusCode !== 200) {
+      Logger.log('❌ APIエラー。上記レスポンスを確認してください。');
+      return;
+    }
+
+    const result = JSON.parse(text);
+    if (result.error) {
+      Logger.log('❌ Gemini エラー: ' + result.error.message);
+      return;
+    }
+
+    const parsed = result.candidates[0].content.parts[0].text;
+    Logger.log('✅ 解析成功: ' + parsed);
+
+  } catch (e) {
+    Logger.log('❌ 例外発生: ' + e.message);
+  }
+}
+
 function _registerTrigger() {
   ScriptApp.getProjectTriggers().forEach((t) => {
     if (t.getHandlerFunction() === 'syncInquiryEmails') {
