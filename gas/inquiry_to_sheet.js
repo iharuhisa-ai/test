@@ -94,6 +94,7 @@ function syncInquiryEmails() {
   const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
   const threadRowMap = _buildThreadRowMap(sheet);
 
+
   const query = _buildQuery();
   const threads = GmailApp.search(query, 0, 20);
 
