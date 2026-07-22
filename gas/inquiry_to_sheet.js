@@ -499,6 +499,9 @@ Web：https://www.bespokejapantravel.com`;
     '未対応',
     '',
     '',
+    '',
+    1,
+    '',
   ]]);
 
   sheet.getRange(insertRow, 1, 1, 1).setNumberFormat('yyyy/MM/dd HH:mm');
