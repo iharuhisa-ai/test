@@ -170,23 +170,20 @@ function syncInquiryEmails() {
   });
 
   if (newRows.length > 0) {
-    const insertRow = 2;
-    sheet.insertRowsBefore(insertRow, newRows.length);
-    const range = sheet.getRange(insertRow, 1, newRows.length, HEADERS.length);
-    range.setValues(newRows);
-
-    sheet.getRange(insertRow, COL.RECEIVED + 1, newRows.length, 1).setNumberFormat('yyyy/MM/dd HH:mm');
-    sheet.getRange(insertRow, COL.LAST_REPLY_AT + 1, newRows.length, 1).setNumberFormat('yyyy/MM/dd HH:mm');
+    const startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, newRows.length, HEADERS.length).setValues(newRows);
+    sheet.getRange(startRow, COL.RECEIVED + 1, newRows.length, 1).setNumberFormat('yyyy/MM/dd HH:mm');
+    sheet.getRange(startRow, COL.LAST_REPLY_AT + 1, newRows.length, 1).setNumberFormat('yyyy/MM/dd HH:mm');
 
     const statusRule = SpreadsheetApp.newDataValidation()
       .requireValueInList(['未対応', '対応中', '完了', '保留'], true)
       .build();
-    sheet.getRange(insertRow, COL.STATUS + 1, newRows.length, 1).setDataValidation(statusRule);
+    sheet.getRange(startRow, COL.STATUS + 1, newRows.length, 1).setDataValidation(statusRule);
 
     for (let i = 0; i < newRows.length; i++) {
       const urgency = newRows[i][COL.URGENCY];
-      if (urgency === '高') sheet.getRange(insertRow + i, 1, 1, HEADERS.length).setBackground('#fce8e6');
-      else if (urgency === '中') sheet.getRange(insertRow + i, 1, 1, HEADERS.length).setBackground('#fef9e7');
+      if (urgency === '高') sheet.getRange(startRow + i, 1, 1, HEADERS.length).setBackground('#fce8e6');
+      else if (urgency === '中') sheet.getRange(startRow + i, 1, 1, HEADERS.length).setBackground('#fef9e7');
     }
 
     _saveProcessedIds(processedIds);
@@ -324,21 +321,20 @@ function importAllExistingEmails() {
     });
 
     if (newRows.length > 0) {
-      const insertRow = 2;
-      sheet.insertRowsBefore(insertRow, newRows.length);
-      const range = sheet.getRange(insertRow, 1, newRows.length, HEADERS.length);
-      range.setValues(newRows);
-      sheet.getRange(insertRow, 1, newRows.length, 1).setNumberFormat('yyyy/MM/dd HH:mm');
+      const startRow = sheet.getLastRow() + 1;
+      sheet.getRange(startRow, 1, newRows.length, HEADERS.length).setValues(newRows);
+      sheet.getRange(startRow, COL.RECEIVED + 1, newRows.length, 1).setNumberFormat('yyyy/MM/dd HH:mm');
+      sheet.getRange(startRow, COL.LAST_REPLY_AT + 1, newRows.length, 1).setNumberFormat('yyyy/MM/dd HH:mm');
 
       const statusRule = SpreadsheetApp.newDataValidation()
         .requireValueInList(['未対応', '対応中', '完了', '保留'], true)
         .build();
-      sheet.getRange(insertRow, COL.STATUS + 1, newRows.length, 1).setDataValidation(statusRule);
+      sheet.getRange(startRow, COL.STATUS + 1, newRows.length, 1).setDataValidation(statusRule);
 
       for (let i = 0; i < newRows.length; i++) {
         const urgency = newRows[i][COL.URGENCY];
-        if (urgency === '高') sheet.getRange(insertRow + i, 1, 1, HEADERS.length).setBackground('#fce8e6');
-        else if (urgency === '中') sheet.getRange(insertRow + i, 1, 1, HEADERS.length).setBackground('#fef9e7');
+        if (urgency === '高') sheet.getRange(startRow + i, 1, 1, HEADERS.length).setBackground('#fce8e6');
+        else if (urgency === '中') sheet.getRange(startRow + i, 1, 1, HEADERS.length).setBackground('#fef9e7');
       }
 
       totalImported += newRows.length;
@@ -480,8 +476,7 @@ Web：https://www.bespokejapantravel.com`;
     }
   }
 
-  const insertRow = 2;
-  sheet.insertRowsBefore(insertRow, 1);
+  const insertRow = sheet.getLastRow() + 1;
   const range = sheet.getRange(insertRow, 1, 1, HEADERS.length);
   range.setValues([[
     new Date('2026-05-29T12:13:18+09:00'),
