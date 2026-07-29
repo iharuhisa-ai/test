@@ -26,7 +26,7 @@ const CONFIG = {
   EXTRA_QUERY: '',
 
   // Gemini API モデル
-  GEMINI_MODEL: 'gemini-2.0-flash',
+  GEMINI_MODEL: 'gemini-2.5-flash',
 };
 
 // ===== ヘッダー定義 =====
