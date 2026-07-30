@@ -5,7 +5,7 @@
  * 1. Google Apps Script (script.google.com) で新規プロジェクトを作成
  * 2. このファイルの内容を貼り付ける
  * 3. CONFIG の各値を自分の環境に合わせて変更
- * 4. スクリプトプロパティに OPENAI_API_KEY を設定（sk-... で始まるキー）
+ * 4. スクリプトプロパティに GEMINI_API_KEY を設定（sk-... で始まるキー）
  *    （エディタ上部: プロジェクトの設定 → スクリプトプロパティ → 追加）
  * 5. 初回は setup() を手動実行してシートとトリガーを作成する
  */
@@ -25,8 +25,8 @@ const CONFIG = {
   // 追加の検索クエリ（例: 'subject:お問い合わせ'）
   EXTRA_QUERY: '',
 
-  // OpenAI モデル（gpt-4o-mini は低コストで高精度）
-  OPENAI_MODEL: 'gpt-4o-mini',
+  // Gemini API モデル
+  GEMINI_MODEL: 'gemini-1.5-flash',
 };
 
 // ===== ヘッダー定義 =====
@@ -91,7 +91,7 @@ function setup() {
 function syncInquiryEmails() {
   const sheet = _getSheet();
   const processedIds = _getProcessedIds();
-  const apiKey = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
   const threadRowMap = _buildThreadRowMap(sheet);
 
 
@@ -194,7 +194,7 @@ function syncInquiryEmails() {
 }
 
 /**
- * OpenAI API でメール本文を解析して構造化情報を返す
+ * Gemini API でメール本文を解析して構造化情報を返す
  */
 function _analyzeWithOpenAI(apiKey, subject, body) {
   const prompt = `以下のメール件名と本文を解析して、JSON形式で情報を抽出してください。
@@ -204,7 +204,7 @@ function _analyzeWithOpenAI(apiKey, subject, body) {
 本文:
 ${body.slice(0, 2000)}
 
-以下のJSON形式のみで返してください（余分なテキストなし）:
+以下のJSON形式で返してください（余分なテキストなし、JSONのみ）:
 {
   "companyName": "会社名（不明の場合は空文字）",
   "personName": "氏名（不明の場合は空文字）",
@@ -214,19 +214,19 @@ ${body.slice(0, 2000)}
   "urgency": "緊急度（高・中・通常のいずれか）"
 }`;
 
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${apiKey}`;
+
   const payload = {
-    model: CONFIG.OPENAI_MODEL,
-    messages: [{ role: 'user', content: prompt }],
-    response_format: { type: 'json_object' },
-    max_tokens: 512,
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      maxOutputTokens: 512,
+    },
   };
 
-  const response = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', {
+  const response = UrlFetchApp.fetch(url, {
     method: 'post',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
   });
@@ -237,7 +237,7 @@ ${body.slice(0, 2000)}
     throw new Error(result.error.message);
   }
 
-  const text = result.choices[0].message.content.trim();
+  const text = result.candidates[0].content.parts[0].text.trim();
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   return jsonMatch ? JSON.parse(jsonMatch[0]) : {};
 }
@@ -250,7 +250,7 @@ ${body.slice(0, 2000)}
 function importAllExistingEmails() {
   const sheet = _getSheet();
   const processedIds = _getProcessedIds();
-  const apiKey = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
 
   // 日付制限なしでラベルのメールをすべて取得（500件まで）
   const parts = [];
@@ -423,7 +423,7 @@ function _saveProcessedIds(idSet) {
  */
 function testWithSampleEmail() {
   const sheet = _getSheet();
-  const apiKey = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
 
   const subject = '【お伺いしたい件】2026年6月28日 宿泊予約 アテンドサービス / Family Haus 0628';
   const body = `株式会社G.S.P.Corporation
@@ -514,34 +514,27 @@ Web：https://www.bespokejapantravel.com`;
  * 実行後、ログにエラー内容または解析結果が表示されます
  */
 /**
- * OpenAI API の動作確認用デバッグ関数
+ * Gemini API の動作確認用デバッグ関数
  */
-function debugTestOpenAI() {
-  const apiKey = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
+function debugTestGemini() {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
 
   if (!apiKey) {
-    Logger.log('❌ OPENAI_API_KEY がスクリプトプロパティに設定されていません');
+    Logger.log('❌ GEMINI_API_KEY がスクリプトプロパティに設定されていません');
     return;
   }
   Logger.log('✅ APIキー確認: ' + apiKey.slice(0, 8) + '...');
 
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${apiKey}`;
   const payload = {
-    model: CONFIG.OPENAI_MODEL,
-    messages: [{
-      role: 'user',
-      content: '株式会社テスト 山田太郎です。製品について問い合わせしたいです。電話: 03-1234-5678\n{"companyName":"","personName":"","phone":"","inquiryType":"","summary":"","urgency":"通常"} の形式でJSONのみ返してください。'
-    }],
-    response_format: { type: 'json_object' },
-    max_tokens: 256,
+    contents: [{ parts: [{ text: '株式会社テスト 山田太郎です。電話: 03-1234-5678\n{"companyName":"","personName":"","phone":"","inquiryType":"","summary":"","urgency":"通常"} の形式でJSONのみ返してください。' }] }],
+    generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 256 },
   };
 
   try {
-    const response = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', {
+    const response = UrlFetchApp.fetch(url, {
       method: 'post',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       payload: JSON.stringify(payload),
       muteHttpExceptions: true,
     });
@@ -556,7 +549,7 @@ function debugTestOpenAI() {
     }
 
     const result = JSON.parse(text);
-    const parsed = result.choices[0].message.content;
+    const parsed = result.candidates[0].content.parts[0].text;
     Logger.log('✅ 解析成功: ' + parsed);
 
   } catch (e) {
