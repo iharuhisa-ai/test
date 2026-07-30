@@ -214,7 +214,10 @@ ${body.slice(0, 2000)}
   "urgency": "緊急度（高・中・通常のいずれか）"
 }`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  const isOAuth = apiKey.startsWith('AQ.');
+  const url = isOAuth
+    ? `https://generativelanguage.googleapis.com/v1/models/${CONFIG.GEMINI_MODEL}:generateContent`
+    : `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
@@ -224,9 +227,12 @@ ${body.slice(0, 2000)}
     },
   };
 
+  const headers = { 'Content-Type': 'application/json' };
+  if (isOAuth) headers['Authorization'] = `Bearer ${apiKey}`;
+
   const response = UrlFetchApp.fetch(url, {
     method: 'post',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers,
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
   });
@@ -525,7 +531,10 @@ function debugTestGemini() {
   const subject = 'テスト問い合わせ';
   const body = '株式会社テスト 山田太郎です。製品について問い合わせしたいです。電話: 03-1234-5678';
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  const isOAuth = apiKey.startsWith('AQ.');
+  const url = isOAuth
+    ? `https://generativelanguage.googleapis.com/v1/models/${CONFIG.GEMINI_MODEL}:generateContent`
+    : `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${apiKey}`;
   const prompt = `以下のメールを解析してJSONで返してください。
 件名: ${subject}
 本文: ${body}
@@ -536,10 +545,14 @@ function debugTestGemini() {
     generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 512 },
   };
 
+  const headers = { 'Content-Type': 'application/json' };
+  if (isOAuth) headers['Authorization'] = `Bearer ${apiKey}`;
+  Logger.log('認証方式: ' + (isOAuth ? 'Bearer Token (OAuth)' : 'API Key'));
+
   try {
     const response = UrlFetchApp.fetch(url, {
       method: 'post',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       payload: JSON.stringify(payload),
       muteHttpExceptions: true,
     });
@@ -565,6 +578,30 @@ function debugTestGemini() {
 
   } catch (e) {
     Logger.log('❌ 例外発生: ' + e.message);
+  }
+}
+
+/**
+ * 利用可能なGeminiモデルを一覧表示するデバッグ関数
+ */
+function debugListModels() {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!apiKey) { Logger.log('❌ GEMINI_API_KEY が設定されていません'); return; }
+
+  const isOAuth = apiKey.startsWith('AQ.');
+  const url = isOAuth
+    ? 'https://generativelanguage.googleapis.com/v1/models'
+    : `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+  const headers = { 'Content-Type': 'application/json' };
+  if (isOAuth) headers['Authorization'] = `Bearer ${apiKey}`;
+
+  const res = UrlFetchApp.fetch(url, { method: 'get', headers: headers, muteHttpExceptions: true });
+  Logger.log('ステータス: ' + res.getResponseCode());
+  const data = JSON.parse(res.getContentText());
+  if (data.models) {
+    data.models.forEach(m => Logger.log(m.name));
+  } else {
+    Logger.log(res.getContentText().slice(0, 500));
   }
 }
 
