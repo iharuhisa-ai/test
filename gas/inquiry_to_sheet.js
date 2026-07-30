@@ -5,7 +5,8 @@
  * 1. Google Apps Script (script.google.com) で新規プロジェクトを作成
  * 2. このファイルの内容を貼り付ける
  * 3. CONFIG の各値を自分の環境に合わせて変更
- * 4. スクリプトプロパティに GEMINI_API_KEY を設定（sk-... で始まるキー）
+ * 4. スクリプトプロパティに GEMINI_API_KEY を設定（AIza... で始まるキー）
+ *    Google AI Studio (https://aistudio.google.com/app/apikey) で取得できます
  *    （エディタ上部: プロジェクトの設定 → スクリプトプロパティ → 追加）
  * 5. 初回は setup() を手動実行してシートとトリガーを作成する
  */
@@ -25,9 +26,20 @@ const CONFIG = {
   // 追加の検索クエリ（例: 'subject:お問い合わせ'）
   EXTRA_QUERY: '',
 
-  // Gemini API モデル
-  GEMINI_MODEL: 'gemini-1.5-flash',
+  // Gemini API モデル（高速・低コスト）
+  GEMINI_MODEL: 'gemini-2.0-flash',
 };
+
+/**
+ * スクリプトプロパティから Gemini API キーを取得する
+ */
+function _getGeminiApiKey() {
+  const key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!key) {
+    Logger.log('⚠️ スクリプトプロパティ GEMINI_API_KEY が未設定です。AI解析はスキップされます。');
+  }
+  return key;
+}
 
 // ===== ヘッダー定義 =====
 const HEADERS = [
@@ -91,7 +103,7 @@ function setup() {
 function syncInquiryEmails() {
   const sheet = _getSheet();
   const processedIds = _getProcessedIds();
-  const apiKey = ScriptApp.getOAuthToken();
+  const apiKey = _getGeminiApiKey();
   const threadRowMap = _buildThreadRowMap(sheet);
 
 
@@ -139,7 +151,7 @@ function syncInquiryEmails() {
     let parsed = { companyName: '', personName: '', phone: '', inquiryType: '', summary: '', urgency: '通常' };
     if (apiKey) {
       try {
-        parsed = _analyzeWithOpenAI(apiKey, firstMsg.getSubject(), body);
+        parsed = _analyzeWithGemini(apiKey, firstMsg.getSubject(), body);
       } catch (e) {
         Logger.log(`AI解析エラー (threadId: ${threadId}): ${e.message}`);
       }
@@ -196,7 +208,7 @@ function syncInquiryEmails() {
 /**
  * Gemini API でメール本文を解析して構造化情報を返す
  */
-function _analyzeWithOpenAI(apiKey, subject, body) {
+function _analyzeWithGemini(apiKey, subject, body) {
   const prompt = `以下のメール件名と本文を解析して、JSON形式で情報を抽出してください。
 
 件名: ${subject}
@@ -214,7 +226,7 @@ ${body.slice(0, 2000)}
   "urgency": "緊急度（高・中・通常のいずれか）"
 }`;
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/${CONFIG.GEMINI_MODEL}:generateContent`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
@@ -226,10 +238,7 @@ ${body.slice(0, 2000)}
 
   const response = UrlFetchApp.fetch(url, {
     method: 'post',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
+    contentType: 'application/json',
     payload: JSON.stringify(payload),
     muteHttpExceptions: true,
   });
@@ -253,7 +262,7 @@ ${body.slice(0, 2000)}
 function importAllExistingEmails() {
   const sheet = _getSheet();
   const processedIds = _getProcessedIds();
-  const apiKey = ScriptApp.getOAuthToken();
+  const apiKey = _getGeminiApiKey();
 
   // 日付制限なしでラベルのメールをすべて取得（500件まで）
   const parts = [];
@@ -287,7 +296,7 @@ function importAllExistingEmails() {
       let parsed = { companyName: '', personName: '', phone: '', inquiryType: '', summary: '', urgency: '通常' };
       if (apiKey) {
         try {
-          parsed = _analyzeWithOpenAI(apiKey, message.getSubject(), body);
+          parsed = _analyzeWithGemini(apiKey, message.getSubject(), body);
         } catch (e) {
           Logger.log(`AI解析エラー (threadId: ${threadId}): ${e.message}`);
         }
@@ -426,7 +435,7 @@ function _saveProcessedIds(idSet) {
  */
 function testWithSampleEmail() {
   const sheet = _getSheet();
-  const apiKey = ScriptApp.getOAuthToken();
+  const apiKey = _getGeminiApiKey();
 
   const subject = '【お伺いしたい件】2026年6月28日 宿泊予約 アテンドサービス / Family Haus 0628';
   const body = `株式会社G.S.P.Corporation
@@ -472,7 +481,7 @@ Web：https://www.bespokejapantravel.com`;
 
   if (apiKey) {
     try {
-      parsed = _analyzeWithOpenAI(apiKey, subject, body);
+      parsed = _analyzeWithGemini(apiKey, subject, body);
       Logger.log('AI解析結果: ' + JSON.stringify(parsed));
     } catch (e) {
       Logger.log('AI解析エラー（フォールバック値を使用）: ' + e.message);
@@ -516,10 +525,14 @@ Web：https://www.bespokejapantravel.com`;
  * Gemini API の動作確認用デバッグ関数
  */
 function debugTestGemini() {
-  const apiKey = ScriptApp.getOAuthToken();
-  Logger.log('✅ OAuthトークン確認: ' + apiKey.slice(0, 8) + '...');
+  const apiKey = _getGeminiApiKey();
+  if (!apiKey) {
+    Logger.log('❌ スクリプトプロパティ GEMINI_API_KEY が未設定です。');
+    return;
+  }
+  Logger.log('✅ APIキー確認: ' + apiKey.slice(0, 6) + '...');
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/${CONFIG.GEMINI_MODEL}:generateContent`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${CONFIG.GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const payload = {
     contents: [{ parts: [{ text: '株式会社テスト 山田太郎です。電話: 03-1234-5678\n{"companyName":"","personName":"","phone":"","inquiryType":"","summary":"","urgency":"通常"} の形式でJSONのみ返してください。' }] }],
     generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 256 },
@@ -528,10 +541,7 @@ function debugTestGemini() {
   try {
     const response = UrlFetchApp.fetch(url, {
       method: 'post',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
+      contentType: 'application/json',
       payload: JSON.stringify(payload),
       muteHttpExceptions: true,
     });
